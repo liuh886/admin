@@ -84,3 +84,5 @@ let css = await readFile(cssPath, 'utf8');
 if (!css.includes(floatingCss)) throw new Error('Expected floating account CSS was not found.');
 css = css.replace(floatingCss, '');
 await writeFile(cssPath, css, 'utf8');
+
+// One-shot branch rewrite; removed before merge.
