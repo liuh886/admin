@@ -12,22 +12,60 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: pages-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify browser impact
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            echo "browser=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only "$BASE_SHA" "$GITHUB_SHA" > changed-files.txt
+          cat changed-files.txt
+          if grep -Eq '^(index\.html|admin\.(js|css)|operations\.(js|css)|feedback-admin\.(js|css)|tests/e2e/|playwright\.config\.js|\.github/workflows/pages\.yml)' changed-files.txt; then
+            echo "browser=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "browser=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
-      - run: npx playwright install --with-deps chromium
-      - run: npm test
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run contract tests
+        run: npm run test:contract
+
+      - name: Install Chromium
+        if: steps.scope.outputs.browser == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser acceptance
+        if: steps.scope.outputs.browser == 'true'
+        run: npm run test:e2e
+
       - uses: actions/configure-pages@v5
         if: github.event_name != 'pull_request'
+
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:
