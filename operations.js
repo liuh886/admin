@@ -207,3 +207,5 @@ client.auth.onAuthStateChange((_event, session) => {
 
 const { data, error } = await client.auth.getSession();
 if (!error && data.session) await refreshOverview(false);
+
+void import('./feedback-admin.js');
