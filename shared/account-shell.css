@@ -532,11 +532,6 @@ html.hao-account-open body {
 }
 
 @media (max-width: 640px) {
-  .hao-account-mount.is-floating {
-    top: max(10px, env(safe-area-inset-top));
-    right: max(10px, env(safe-area-inset-right));
-  }
-
   .hao-account-trigger-label {
     display: none;
   }
