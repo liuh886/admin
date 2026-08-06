@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#111318">
+  <title>Hao Apps · Membership Operations</title>
+  <link rel="stylesheet" href="./admin.css">
+</head>
+<body>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+
+  <main class="shell">
+    <section id="auth-gate" class="auth-gate" aria-labelledby="auth-title">
+      <div class="brand-mark" aria-hidden="true">H</div>
+      <p class="eyebrow">HAO APPS · PRIVATE OPERATIONS</p>
+      <h1 id="auth-title">会员运营台</h1>
+      <p class="auth-copy">使用共享 Supabase 账户登录。只有管理员白名单中的账号可以读取用户、处理赠送与执行退款。</p>
+      <button id="google-login" class="button primary" type="button">使用 Google 登录</button>
+      <p id="auth-status" class="status-line" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="console" class="console" hidden>
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark small" aria-hidden="true">H</div>
+          <div>
+            <p class="eyebrow">MEMBERSHIP OPERATIONS</p>
+            <h1>Hao Apps</h1>
+          </div>
+        </div>
+        <div class="operator">
+          <div>
+            <strong id="operator-email">—</strong>
+            <span id="operator-role">—</span>
+          </div>
+          <button id="sign-out" class="button ghost compact" type="button">退出</button>
+        </div>
+      </header>
+
+      <section class="hero-row">
+        <div>
+          <p class="eyebrow">LIVE BILLING CONTROL</p>
+          <h2>会员、权益与退款，集中在一个可信入口。</h2>
+          <p>所有写操作由 Supabase Edge Function 执行，并记录到只追加的审计台账。</p>
+        </div>
+        <span class="live-pill"><i></i> Live mode</span>
+      </section>
+
+      <section class="stats" aria-label="会员概览">
+        <article><span>登录用户</span><strong id="stat-users">—</strong></article>
+        <article><span>有效订阅</span><strong id="stat-subscriptions">—</strong></article>
+        <article><span>有效授权</span><strong id="stat-grants">—</strong></article>
+        <article><span>管理操作</span><strong id="stat-actions">—</strong></article>
+      </section>
+
+      <section class="search-panel">
+        <div>
+          <p class="eyebrow">MEMBER LOOKUP</p>
+          <h2>查找会员</h2>
+          <p>用户需要至少完成过一次 Supabase 登录。</p>
+        </div>
+        <form id="member-search" class="search-form">
+          <label>
+            <span>邮箱地址</span>
+            <input id="search-email" type="email" autocomplete="off" placeholder="user@example.com" required>
+          </label>
+          <button class="button primary" type="submit">打开会员档案</button>
+        </form>
+      </section>
+
+      <p id="console-status" class="status-line console-status" role="status" aria-live="polite"></p>
+
+      <section id="empty-workspace" class="empty-workspace">
+        <div class="empty-orbit" aria-hidden="true"><span></span></div>
+        <h2>从一个用户开始</h2>
+        <p>检索邮箱后，可以查看 Stripe 订阅、有效权益、人工赠送和历史付款。</p>
+      </section>
+
+      <section id="member-workspace" class="member-workspace" hidden>
+        <header class="member-header">
+          <div>
+            <p class="eyebrow">MEMBER PROFILE</p>
+            <h2 id="member-email">—</h2>
+            <p id="member-meta">—</p>
+          </div>
+          <div id="member-tier" class="member-tier">FREE</div>
+        </header>
+
+        <nav class="tabs" aria-label="会员详情">
+          <button class="tab is-active" type="button" data-tab="access">权益</button>
+          <button class="tab" type="button" data-tab="billing">账务</button>
+          <button class="tab" type="button" data-tab="activity">审计</button>
+        </nav>
+
+        <section class="tab-panel is-active" data-panel="access">
+          <div class="workspace-grid">
+            <article class="panel">
+              <div class="panel-heading">
+                <div><p class="eyebrow">EFFECTIVE ACCESS</p><h3>当前有效权益</h3></div>
+              </div>
+              <div id="entitlement-list" class="chip-list"></div>
+            </article>
+
+            <article class="panel gift-panel">
+              <div class="panel-heading">
+                <div><p class="eyebrow">COMPLIMENTARY ACCESS</p><h3>赠送会员</h3></div>
+              </div>
+              <form id="gift-form" class="stack-form">
+                <label><span>产品</span><select id="gift-product" required></select></label>
+                <label><span>期限</span>
+                  <select id="gift-duration" required>
+                    <option value="30">30 天</option>
+                    <option value="90">90 天</option>
+                    <option value="365" selected>1 年</option>
+                    <option value="">永久</option>
+                  </select>
+                </label>
+                <label class="full"><span>原因 / 备注</span><input id="gift-reason" type="text" maxlength="500" value="Complimentary membership"></label>
+                <button class="button primary full" type="submit">确认赠送</button>
+              </form>
+            </article>
+          </div>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">GRANT SOURCES</p><h3>授权来源</h3></div>
+              <span class="subtle">Stripe 与人工赠送可叠加</span>
+            </div>
+            <div id="grant-list" class="record-list"></div>
+          </article>
+        </section>
+
+        <section class="tab-panel" data-panel="billing">
+          <article class="panel">
+            <div class="panel-heading"><div><p class="eyebrow">SUBSCRIPTIONS</p><h3>Stripe 订阅</h3></div></div>
+            <div id="subscription-list" class="record-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">PAYMENTS</p><h3>付款与退款</h3></div>
+              <span class="warning-copy">退款不会自动取消订阅</span>
+            </div>
+            <div id="payment-list" class="record-list"></div>
+          </article>
+        </section>
+
+        <section class="tab-panel" data-panel="activity">
+          <article class="panel">
+            <div class="panel-heading"><div><p class="eyebrow">AUDIT TRAIL</p><h3>管理操作记录</h3></div></div>
+            <div id="activity-list" class="record-list"></div>
+          </article>
+        </section>
+      </section>
+
+      <section class="recent-section">
+        <div class="section-heading"><div><p class="eyebrow">RECENT OPERATIONS</p><h2>最近操作</h2></div></div>
+        <div id="recent-actions" class="recent-grid"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="refund-dialog" class="action-dialog">
+    <form id="refund-form" method="dialog">
+      <header><div><p class="eyebrow">FINANCIAL ACTION</p><h2>退款</h2></div><button class="icon-button" value="cancel" aria-label="关闭">×</button></header>
+      <p id="refund-summary" class="dialog-summary"></p>
+      <label><span>退款金额</span><div class="money-input"><span id="refund-currency">USD</span><input id="refund-amount" type="number" min="0.01" step="0.01" required></div></label>
+      <label><span>退款原因</span><select id="refund-reason"><option value="requested_by_customer">客户要求</option><option value="duplicate">重复付款</option><option value="fraudulent">欺诈付款</option></select></label>
+      <label><span>退款后的订阅处理</span><select id="refund-subscription-action"><option value="cancel_now">立即取消并撤销会员</option><option value="cancel_at_period_end">周期结束时取消</option><option value="keep">保留订阅</option></select></label>
+      <label><span>对应订阅</span><select id="refund-subscription"></select></label>
+      <label><span>输入 REFUND 确认</span><input id="refund-confirmation" autocomplete="off" required></label>
+      <p class="danger-note">这是 Live Mode 资金操作。提交后款项将退回原支付方式。</p>
+      <div class="dialog-actions"><button class="button ghost" value="cancel">取消</button><button id="refund-submit" class="button danger" type="submit">执行退款</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="cancel-dialog" class="action-dialog">
+    <form id="cancel-form" method="dialog">
+      <header><div><p class="eyebrow">SUBSCRIPTION ACTION</p><h2>取消订阅</h2></div><button class="icon-button" value="cancel" aria-label="关闭">×</button></header>
+      <p id="cancel-summary" class="dialog-summary"></p>
+      <label><span>取消方式</span><select id="cancel-mode"><option value="period_end">周期结束时取消</option><option value="immediate">立即取消并撤销会员</option></select></label>
+      <label><span>输入 CANCEL 确认</span><input id="cancel-confirmation" autocomplete="off" required></label>
+      <div class="dialog-actions"><button class="button ghost" value="cancel">返回</button><button class="button danger" type="submit">确认取消</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="./admin.js"></script>
+</body>
+</html>
