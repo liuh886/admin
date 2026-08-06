@@ -3,10 +3,12 @@
 Public browser assets:
 
 ```html
-<link rel="stylesheet" href="https://liuh886.github.io/admin/shared/account-shell.css">
+<link rel="stylesheet" href="https://liuh886.github.io/admin/shared/account-shell.css?v=1">
 <script src="./account-config.js"></script>
-<script src="https://liuh886.github.io/admin/shared/account-shell.js"></script>
+<script src="https://liuh886.github.io/admin/shared/account-shell.js?v=1"></script>
 ```
+
+Deploy the shared `admin` assets before merging a product integration. The version query is part of the rollout contract and should be incremented only when a browser-incompatible shell change requires a coordinated product update.
 
 Each product owns only its public configuration:
 
