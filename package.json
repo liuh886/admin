@@ -1,0 +1,14 @@
+{
+  "name": "hao-apps-membership-admin",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:contract && npm run test:e2e",
+    "test:contract": "node tests/membership-admin-contract.test.js",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  }
+}
