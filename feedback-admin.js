@@ -301,6 +301,7 @@ async function saveFeedback(card, button) {
   const adminNote = card.querySelector('[data-feedback-note]')?.value || '';
   if (!feedbackId || !status) return;
 
+  let saved = false;
   setLoading(true);
   button.textContent = '保存中…';
   setStatus('正在保存反馈处理状态…');
@@ -312,7 +313,8 @@ async function saveFeedback(card, button) {
     });
     const index = state.feedback.findIndex((item) => item.id === feedbackId);
     if (index >= 0) state.feedback[index] = { ...state.feedback[index], ...result.feedback };
-    await loadFeedback({ append: false });
+    renderFeedback();
+    saved = true;
     setStatus('反馈处理状态已保存，并写入管理审计记录。', 'success');
   } catch (error) {
     setStatus(error.message, 'error');
@@ -320,6 +322,8 @@ async function saveFeedback(card, button) {
     button.textContent = '保存处理';
     setLoading(false);
   }
+
+  if (saved) await loadFeedback({ append: false });
 }
 
 els.applyFilters?.addEventListener('click', () => {
