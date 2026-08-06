@@ -1,0 +1,228 @@
+name: Import membership admin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/import-admin.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  SOURCE_BASE: https://raw.githubusercontent.com/liuh886/FlappyK/master
+  OLD_URL: https://liuh886.github.io/FlappyK/admin/
+  NEW_URL: https://liuh886.github.io/admin/
+
+jobs:
+  import:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Import canonical admin sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs supabase/functions/membership-admin supabase/migrations tests/e2e
+
+          curl -fsSL "$SOURCE_BASE/admin/index.html" -o index.html
+          curl -fsSL "$SOURCE_BASE/admin/admin.css" -o admin.css
+          curl -fsSL "$SOURCE_BASE/admin/admin.js" -o admin.js
+          curl -fsSL "$SOURCE_BASE/docs/MEMBERSHIP_ADMIN.md" -o docs/MEMBERSHIP_ADMIN.md
+          curl -fsSL "$SOURCE_BASE/supabase/functions/membership-admin/index.ts" -o supabase/functions/membership-admin/index.ts
+          curl -fsSL "$SOURCE_BASE/supabase/migrations/0004_membership_admin_console.sql" -o supabase/migrations/0004_membership_admin_console.sql
+          curl -fsSL "$SOURCE_BASE/supabase/migrations/0005_membership_admin_explicit_deny.sql" -o supabase/migrations/0005_membership_admin_explicit_deny.sql
+
+          # The console now lives at the root of the dedicated GitHub Pages repository.
+          sed -i "s|$OLD_URL|$NEW_URL|g" admin.js docs/MEMBERSHIP_ADMIN.md
+          touch .nojekyll
+
+          cat > package.json <<'JSON'
+          {
+            "name": "hao-apps-membership-admin",
+            "private": true,
+            "version": "1.0.0",
+            "type": "module",
+            "scripts": {
+              "test": "node tests/membership-admin-contract.test.js && playwright test",
+              "test:contract": "node tests/membership-admin-contract.test.js",
+              "test:e2e": "playwright test"
+            },
+            "devDependencies": {
+              "@playwright/test": "^1.54.2"
+            }
+          }
+          JSON
+
+          cat > playwright.config.js <<'JS'
+          import { defineConfig } from '@playwright/test';
+
+          export default defineConfig({
+            testDir: './tests/e2e',
+            use: {
+              baseURL: 'http://127.0.0.1:4173',
+              headless: true
+            },
+            webServer: {
+              command: 'python3 -m http.server 4173 --bind 127.0.0.1',
+              port: 4173,
+              reuseExistingServer: false
+            }
+          });
+          JS
+
+          cat > tests/membership-admin-contract.test.js <<'JS'
+          import fs from 'node:fs';
+
+          const html = fs.readFileSync('index.html', 'utf8');
+          const script = fs.readFileSync('admin.js', 'utf8');
+          const edge = fs.readFileSync('supabase/functions/membership-admin/index.ts', 'utf8');
+          const migration = fs.readFileSync('supabase/migrations/0004_membership_admin_console.sql', 'utf8');
+          const combined = `${html}\n${script}`;
+
+          function expect(condition, message) {
+            if (!condition) throw new Error(message);
+          }
+
+          expect(html.includes('noindex,nofollow,noarchive'), 'Admin console must remain unindexed');
+          expect(script.includes("redirectUrl: 'https://liuh886.github.io/admin/'"), 'Canonical OAuth redirect must use /admin/');
+          expect(!combined.includes('https://liuh886.github.io/FlappyK/admin/'), 'Legacy FlappyK URL must not remain in frontend');
+          expect(script.includes('/functions/v1/membership-admin'), 'Frontend must call the protected admin function');
+          expect(edge.includes('membership_admins'), 'Edge function must verify the admin whitelist');
+          expect(edge.includes('Administrator access is required.'), 'Unauthorized users must be rejected');
+          expect(edge.includes('confirmation !== "REFUND"'), 'Refunds must require typed confirmation');
+          expect(edge.includes('confirmation !== "CANCEL"'), 'Cancellations must require typed confirmation');
+          expect(migration.includes('membership_admin_actions'), 'Audit table migration must be present');
+          expect(!combined.match(/sk_(?:live|test)_[A-Za-z0-9]/), 'Stripe secret must never be committed to the browser');
+          expect(!combined.includes('service_role'), 'Service-role credentials must never be referenced by the browser');
+
+          console.log('Membership admin contract checks passed');
+          JS
+
+          cat > tests/e2e/admin.spec.js <<'JS'
+          import { test, expect } from '@playwright/test';
+
+          test('private console starts at the administrator login gate', async ({ page }) => {
+            let redirectTo = '';
+            await page.route('https://cdn.jsdelivr.net/**', (route) => route.fulfill({
+              contentType: 'application/javascript',
+              body: `
+                export function createClient() {
+                  return {
+                    auth: {
+                      getSession: async () => ({ data: { session: null }, error: null }),
+                      onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+                      signInWithOAuth: async ({ options }) => {
+                        window.__redirectTo = options.redirectTo;
+                        return { error: null };
+                      },
+                      signOut: async () => ({ error: null })
+                    }
+                  };
+                }
+              `
+            }));
+
+            await page.goto('/');
+            await expect(page).toHaveTitle('Hao Apps · Membership Operations');
+            await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex,nofollow,noarchive');
+            await expect(page.getByRole('heading', { name: '会员运营台' })).toBeVisible();
+            await expect(page.locator('#console')).toBeHidden();
+
+            await page.getByRole('button', { name: '使用 Google 登录' }).click();
+            redirectTo = await page.evaluate(() => window.__redirectTo ?? '');
+            expect(redirectTo).toBe('https://liuh886.github.io/admin/');
+          });
+          JS
+
+          cat > README.md <<'MD'
+          # Hao Apps Membership Admin
+
+          Private operations console for the shared Hao Apps membership platform.
+
+          **Production:** https://liuh886.github.io/admin/
+
+          ## Scope
+
+          - Search Supabase Auth users by email.
+          - Inspect subscriptions, payments, grants, and effective entitlements.
+          - Grant, extend, and revoke complimentary membership.
+          - Cancel Stripe subscriptions at period end or immediately.
+          - Issue full or partial refunds with explicit subscription handling.
+          - Record append-only administrative audit events.
+
+          ## Security boundary
+
+          The browser contains only the Supabase publishable key. Every privileged request requires a valid Supabase JWT and an active row in `membership_admins`. Stripe secrets and the Supabase service role remain inside the `membership-admin` Edge Function.
+
+          See `docs/MEMBERSHIP_ADMIN.md` for operations and deployment details.
+          MD
+
+      - name: Create Pages workflow
+        shell: bash
+        run: |
+          cat > .github/workflows/pages.yml <<'YAML'
+          name: Validate and deploy
+
+          on:
+            push:
+              branches: [main]
+            pull_request:
+            workflow_dispatch:
+
+          permissions:
+            contents: read
+            pages: write
+            id-token: write
+
+          concurrency:
+            group: pages-${{ github.ref }}
+            cancel-in-progress: true
+
+          jobs:
+            validate:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: 22
+                    cache: npm
+                - run: npm install
+                - run: npx playwright install --with-deps chromium
+                - run: npm test
+                - uses: actions/configure-pages@v5
+                  if: github.event_name != 'pull_request'
+                - uses: actions/upload-pages-artifact@v3
+                  if: github.event_name != 'pull_request'
+                  with:
+                    path: .
+
+            deploy:
+              if: github.event_name != 'pull_request'
+              environment:
+                name: github-pages
+                url: ${{ steps.deployment.outputs.page_url }}
+              runs-on: ubuntu-latest
+              needs: validate
+              steps:
+                - name: Deploy to GitHub Pages
+                  id: deployment
+                  uses: actions/deploy-pages@v4
+          YAML
+
+      - name: Commit imported application
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .
+          git commit -m "feat: migrate membership operations console" || exit 0
+          git push
