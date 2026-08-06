@@ -14,7 +14,7 @@ const config = Object.freeze({
 });
 
 const client = createClient(config.supabaseUrl, config.publishableKey, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' }
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce' }
 });
 
 const $ = (selector) => document.querySelector(selector);
