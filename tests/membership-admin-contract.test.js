@@ -17,8 +17,8 @@ expect(!combinedBrowser.includes('https://liuh886.github.io/FlappyK/admin/'), 'L
 expect(script.includes('/functions/v1/membership-admin'), 'Frontend must call the protected admin function');
 expect(edge.includes('membership_admins'), 'Edge function must verify the admin whitelist');
 expect(edge.includes('Administrator access is required.'), 'Unauthorized users must be rejected');
-expect(edge.includes('confirmation !== "REFUND"'), 'Refunds must require typed confirmation');
-expect(edge.includes('confirmation !== "CANCEL"'), 'Cancellations must require typed confirmation');
+expect(edge.includes('"REFUND"') && edge.includes('Type REFUND to confirm this financial action.'), 'Refunds must require typed confirmation');
+expect(edge.includes('"CANCEL"') && edge.includes('Type CANCEL to confirm subscription cancellation.'), 'Cancellations must require typed confirmation');
 expect(migration.includes('membership_admin_actions'), 'Audit table migration must be present');
 expect(denyMigration.includes('using (false)'), 'Browser roles must be explicitly denied');
 expect(!combinedBrowser.match(/sk_(?:live|test)_[A-Za-z0-9]/), 'Stripe secret must never be committed to the browser');
