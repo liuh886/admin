@@ -10,3 +10,5 @@ const legacy = `  .hao-account-mount.is-floating {
 `;
 if (!source.includes(legacy)) throw new Error('Legacy mobile floating account rule was not found.');
 await writeFile(path, source.replace(legacy, ''), 'utf8');
+
+// One-shot branch cleanup. Remove this helper before merge.
