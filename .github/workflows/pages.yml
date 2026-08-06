@@ -47,10 +47,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
-      - name: Install locked dependencies
-        run: npm ci
+      - name: Install test dependencies
+        run: npm install
 
       - name: Run contract tests
         run: npm run test:contract
