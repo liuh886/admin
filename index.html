@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta name="theme-color" content="#111318">
-  <title>Hao Apps · Membership Operations</title>
+  <title>Hao Apps · Private Operations</title>
   <link rel="stylesheet" href="./admin.css">
 </head>
 <body>
@@ -17,7 +17,7 @@
       <div class="brand-mark" aria-hidden="true">H</div>
       <p class="eyebrow">HAO APPS · PRIVATE OPERATIONS</p>
       <h1 id="auth-title">会员运营台</h1>
-      <p class="auth-copy">使用共享 Supabase 账户登录。只有管理员白名单中的账号可以读取用户、处理赠送与执行退款。</p>
+      <p class="auth-copy">使用共享 Supabase 账户登录。只有管理员白名单中的账号可以读取经营数据、管理会员与执行退款。</p>
       <button id="google-login" class="button primary" type="button">使用 Google 登录</button>
       <p id="auth-status" class="status-line" role="status" aria-live="polite"></p>
     </section>
@@ -27,7 +27,7 @@
         <div class="brand-lockup">
           <div class="brand-mark small" aria-hidden="true">H</div>
           <div>
-            <p class="eyebrow">MEMBERSHIP OPERATIONS</p>
+            <p class="eyebrow">PRIVATE OPERATIONS</p>
             <h1>Hao Apps</h1>
           </div>
         </div>
@@ -42,9 +42,9 @@
 
       <section class="hero-row">
         <div>
-          <p class="eyebrow">LIVE BILLING CONTROL</p>
-          <h2>会员、权益与退款，集中在一个可信入口。</h2>
-          <p>所有写操作由 Supabase Edge Function 执行，并记录到只追加的审计台账。</p>
+          <p class="eyebrow">LIVE OPERATIONS CONTROL</p>
+          <h2>访问、收入、会员与退款，集中在一个可信入口。</h2>
+          <p>GA4 与 Stripe 只通过受保护的 Supabase Edge Function 读取；所有会员写操作继续记录到只追加的审计台账。</p>
         </div>
         <span class="live-pill"><i></i> Live mode</span>
       </section>
@@ -54,6 +54,75 @@
         <article><span>有效订阅</span><strong id="stat-subscriptions">—</strong></article>
         <article><span>有效授权</span><strong id="stat-grants">—</strong></article>
         <article><span>管理操作</span><strong id="stat-actions">—</strong></article>
+      </section>
+
+      <section id="business-overview" class="business-overview" aria-labelledby="business-overview-title">
+        <div class="section-heading overview-heading">
+          <div>
+            <p class="eyebrow">TRAFFIC & REVENUE</p>
+            <h2 id="business-overview-title">经营总览</h2>
+            <p>六个 GA4 Property 与 Stripe Live Mode 的只读汇总。</p>
+          </div>
+          <button id="overview-refresh" class="button ghost compact" type="button">刷新数据</button>
+        </div>
+        <p id="overview-status" class="status-line" role="status" aria-live="polite"></p>
+
+        <section class="overview-kpis" aria-label="经营关键指标">
+          <article><span>30 日会话</span><strong id="overview-stat-sessions">—</strong></article>
+          <article><span>30 日页面浏览</span><strong id="overview-stat-views">—</strong></article>
+          <article><span>正常上报 Property</span><strong id="overview-stat-properties">—</strong></article>
+          <article><span>30 日成功付款</span><strong id="overview-stat-payments">—</strong></article>
+        </section>
+
+        <div class="overview-grid">
+          <article class="panel traffic-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">GOOGLE ANALYTICS 4</p><h3>产品访问</h3></div>
+              <span class="subtle">7 日 / 30 日</span>
+            </div>
+            <div class="table-scroll">
+              <table class="traffic-table">
+                <thead>
+                  <tr>
+                    <th>产品</th>
+                    <th>7 日用户</th>
+                    <th>30 日用户</th>
+                    <th>会话</th>
+                    <th>浏览</th>
+                    <th>互动率</th>
+                    <th>平均会话</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody id="traffic-rows">
+                  <tr><td colspan="8" class="empty-copy">正在载入 GA4 数据…</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p id="traffic-note" class="overview-note"></p>
+          </article>
+
+          <div class="revenue-column">
+            <article class="panel">
+              <div class="panel-heading">
+                <div><p class="eyebrow">STRIPE · 30 DAYS</p><h3>收款与退款</h3></div>
+                <span class="subtle">扣退款后金额不含 Stripe 手续费</span>
+              </div>
+              <div id="revenue-summary" class="money-list"><p class="empty-copy">正在载入 Stripe 数据…</p></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">SUBSCRIPTIONS</p><h3>订阅状态</h3></div></div>
+              <div id="subscription-summary" class="subscription-overview"></div>
+            </article>
+
+            <article class="panel balance-panel">
+              <div class="panel-heading"><div><p class="eyebrow">BALANCE & PAYOUTS</p><h3>余额与打款</h3></div></div>
+              <div id="balance-summary" class="balance-summary"></div>
+              <div id="payout-list" class="payout-list"></div>
+            </article>
+          </div>
+        </div>
       </section>
 
       <section class="search-panel">
@@ -187,5 +256,6 @@
   </dialog>
 
   <script type="module" src="./admin.js"></script>
+  <script type="module" src="./operations.js"></script>
 </body>
 </html>

@@ -21,10 +21,11 @@ test('private console starts at the administrator login gate', async ({ page }) 
   }));
 
   await page.goto('/');
-  await expect(page).toHaveTitle('Hao Apps · Membership Operations');
+  await expect(page).toHaveTitle('Hao Apps · Private Operations');
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex,nofollow,noarchive');
   await expect(page.getByRole('heading', { name: '会员运营台' })).toBeVisible();
   await expect(page.locator('#console')).toBeHidden();
+  await expect(page.locator('#business-overview')).toBeHidden();
 
   await page.getByRole('button', { name: '使用 Google 登录' }).click();
   const redirectTo = await page.evaluate(() => window.__redirectTo ?? '');

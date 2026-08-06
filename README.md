@@ -6,6 +6,8 @@ Private operations console for the shared Hao Apps membership platform.
 
 ## Scope
 
+- Summarize 7-day and 30-day GA4 traffic across Hao Apps properties.
+- Summarize Stripe charges, refunds, subscription state, balances, and payouts.
 - Search Supabase Auth users by email.
 - Inspect subscriptions, payments, grants, and effective entitlements.
 - Grant, extend, and revoke complimentary membership.
@@ -15,16 +17,21 @@ Private operations console for the shared Hao Apps membership platform.
 
 ## Security boundary
 
-The browser contains only the Supabase publishable key. Every privileged request requires a valid Supabase JWT and an active row in `membership_admins`. Stripe secrets and the Supabase service role remain inside the JWT-protected `membership-admin` Edge Function.
+The browser contains only the Supabase publishable key. Every privileged request requires a valid Supabase JWT and an active row in `membership_admins`. Stripe secrets, the Google Analytics service-account credential, and the Supabase service role remain inside JWT-protected Edge Functions.
 
 The console is intentionally excluded from search indexing and is not linked from public product navigation. Knowing the URL does not grant administrative access.
 
+## Server functions
+
+- `membership-admin`: member lookup, complimentary grants, cancellations, and refunds.
+- `operations-overview`: read-only GA4 and Stripe operating summary with a short server-side cache.
+
 ## Repository ownership
 
-This repository is now the canonical source for:
+This repository is the canonical source for:
 
-- the static membership operations console;
-- the `membership-admin` Supabase Edge Function;
+- the static membership and operations console;
+- the `membership-admin` and `operations-overview` Supabase Edge Functions;
 - admin-specific database migrations;
 - operational documentation and acceptance tests.
 

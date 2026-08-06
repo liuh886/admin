@@ -2,10 +2,13 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync('index.html', 'utf8');
 const script = fs.readFileSync('admin.js', 'utf8');
+const operationsScript = fs.readFileSync('operations.js', 'utf8');
+const operationsCss = fs.readFileSync('operations.css', 'utf8');
 const edge = fs.readFileSync('supabase/functions/membership-admin/index.ts', 'utf8');
+const overviewEdge = fs.readFileSync('supabase/functions/operations-overview/index.ts', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/0004_membership_admin_console.sql', 'utf8');
 const denyMigration = fs.readFileSync('supabase/migrations/0005_membership_admin_explicit_deny.sql', 'utf8');
-const combinedBrowser = `${html}\n${script}`;
+const combinedBrowser = `${html}\n${script}\n${operationsScript}\n${operationsCss}`;
 
 function expect(condition, message) {
   if (!condition) throw new Error(message);
@@ -15,13 +18,25 @@ expect(html.includes('noindex,nofollow,noarchive'), 'Admin console must remain u
 expect(script.includes("redirectUrl: 'https://liuh886.github.io/admin/'"), 'Canonical OAuth redirect must use /admin/');
 expect(!combinedBrowser.includes('https://liuh886.github.io/FlappyK/admin/'), 'Legacy FlappyK URL must not remain in the standalone frontend');
 expect(script.includes('/functions/v1/membership-admin'), 'Frontend must call the protected admin function');
-expect(edge.includes('membership_admins'), 'Edge function must verify the admin whitelist');
-expect(edge.includes('Administrator access is required.'), 'Unauthorized users must be rejected');
+expect(operationsScript.includes('/functions/v1/operations-overview'), 'Frontend must call the protected overview function');
+expect(html.includes('id="business-overview"'), 'Traffic and revenue overview must be present');
+expect(html.includes('id="traffic-rows"'), 'GA4 property table must be present');
+expect(html.includes('id="revenue-summary"'), 'Stripe revenue summary must be present');
+expect(edge.includes('membership_admins'), 'Membership function must verify the admin whitelist');
+expect(overviewEdge.includes('membership_admins'), 'Overview function must verify the admin whitelist');
+expect(overviewEdge.includes('Administrator access is required.'), 'Unauthorized overview users must be rejected');
+expect(overviewEdge.includes('https://www.googleapis.com/auth/analytics.readonly'), 'GA4 access must remain read-only');
+expect(overviewEdge.includes('GA4_SERVICE_ACCOUNT_JSON_B64'), 'GA4 credentials must come from Supabase secrets');
+expect(overviewEdge.includes('GA4_PROPERTY_IDS'), 'GA4 property mapping must come from Supabase secrets');
+expect(overviewEdge.includes('stripeRequest("balance")'), 'Stripe account balance must be read server-side');
+expect(overviewEdge.includes('stripeRequest("payouts?limit=5")'), 'Stripe payouts must be read server-side');
 expect(edge.includes('"REFUND"') && edge.includes('Type REFUND to confirm this financial action.'), 'Refunds must require typed confirmation');
 expect(edge.includes('"CANCEL"') && edge.includes('Type CANCEL to confirm subscription cancellation.'), 'Cancellations must require typed confirmation');
 expect(migration.includes('membership_admin_actions'), 'Audit table migration must be present');
 expect(denyMigration.includes('using (false)'), 'Browser roles must be explicitly denied');
 expect(!combinedBrowser.match(/sk_(?:live|test)_[A-Za-z0-9]/), 'Stripe secret must never be committed to the browser');
 expect(!combinedBrowser.includes('service_role'), 'Service-role credentials must never be referenced by the browser');
+expect(!combinedBrowser.includes('private_key'), 'Google service-account private key must never enter the browser');
+expect(!combinedBrowser.includes('GA4_SERVICE_ACCOUNT_JSON_B64'), 'GA4 server secret name must not be exposed by the browser');
 
-console.log('Membership admin contract checks passed');
+console.log('Membership and operations admin contract checks passed');
