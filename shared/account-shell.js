@@ -640,32 +640,35 @@
   }
 
   function attachTrigger() {
-    if (triggerHost?.isConnected) return;
-    triggerHost = document.createElement('div');
-    triggerHost.id = `hao-account-${config.productCode || 'app'}`;
-    triggerHost.className = 'hao-account-mount';
+    if (!triggerHost) {
+      triggerHost = document.createElement('div');
+      triggerHost.id = `hao-account-${config.productCode || 'app'}`;
+      triggerHost.className = 'hao-account-mount is-embedded';
+    }
+
     const target = findMount();
-    if (target) {
-      triggerHost.classList.add('is-embedded');
+    if (!target) {
+      triggerHost.remove();
+      return false;
+    }
+
+    if (triggerHost.parentElement !== target) {
       if (config.mountPosition === 'prepend') target.prepend(triggerHost);
       else target.appendChild(triggerHost);
-    } else {
-      triggerHost.classList.add('is-floating');
-      document.body.appendChild(triggerHost);
-      if (Array.isArray(config.mountSelectors) || config.mountSelector) {
-        mountObserver = new MutationObserver(() => {
-          const laterTarget = findMount();
-          if (!laterTarget || !triggerHost?.isConnected) return;
-          triggerHost.classList.remove('is-floating');
-          triggerHost.classList.add('is-embedded');
-          laterTarget.appendChild(triggerHost);
-          mountObserver?.disconnect();
-        });
-        mountObserver.observe(document.documentElement, { childList: true, subtree: true });
-        window.setTimeout(() => mountObserver?.disconnect(), 10000);
-      }
+      renderTrigger();
+    } else if (!triggerHost.firstChild) {
+      renderTrigger();
     }
-    renderTrigger();
+    return true;
+  }
+
+  function observeMount() {
+    mountObserver?.disconnect();
+    mountObserver = new MutationObserver(() => {
+      const target = findMount();
+      if (!target || triggerHost?.parentElement !== target) attachTrigger();
+    });
+    mountObserver.observe(document.documentElement, { childList: true, subtree: true });
   }
 
   async function initialise() {
@@ -674,6 +677,7 @@
     overlayHost.hidden = true;
     document.body.appendChild(overlayHost);
     attachTrigger();
+    observeMount();
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && state.open) close();
     });
