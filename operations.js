@@ -1,5 +1,12 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
+if (!document.querySelector('link[href="./operations.css"]')) {
+  const stylesheet = document.createElement('link');
+  stylesheet.rel = 'stylesheet';
+  stylesheet.href = './operations.css';
+  document.head.appendChild(stylesheet);
+}
+
 const config = Object.freeze({
   supabaseUrl: 'https://blgwlycfcwvsupmqyqwn.supabase.co',
   publishableKey: 'sb_publishable_n1Va-c_alpkQ0zNuJYUaxA_J0u68RVW',
@@ -124,7 +131,7 @@ function renderTraffic(analytics) {
   const failed = properties.filter((property) => property.status !== 'ok');
   els.trafficNote.textContent = failed.length
     ? `${failed.length} 个 Property 查询失败：${failed.map((item) => `${item.name} · ${item.error}`).join('；')}`
-    : `活跃用户为各 Property 独立口径，跨产品相加可能包含同一访客。GA4 当日数据可能存在处理延迟。`;
+    : '活跃用户为各 Property 独立口径，跨产品相加可能包含同一访客。GA4 当日数据可能存在处理延迟。';
   els.trafficNote.dataset.kind = failed.length ? 'error' : '';
 }
 
