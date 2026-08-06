@@ -40,7 +40,6 @@ jobs:
           curl -fsSL "$SOURCE_BASE/supabase/migrations/0004_membership_admin_console.sql" -o supabase/migrations/0004_membership_admin_console.sql
           curl -fsSL "$SOURCE_BASE/supabase/migrations/0005_membership_admin_explicit_deny.sql" -o supabase/migrations/0005_membership_admin_explicit_deny.sql
 
-          # The console now lives at the root of the dedicated GitHub Pages repository.
           sed -i "s|$OLD_URL|$NEW_URL|g" admin.js docs/MEMBERSHIP_ADMIN.md
           touch .nojekyll
 
@@ -226,3 +225,5 @@ jobs:
           git add .
           git commit -m "feat: migrate membership operations console" || exit 0
           git push
+
+# migration-trigger: 2
