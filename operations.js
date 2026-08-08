@@ -140,7 +140,7 @@ function renderRum(cloudflare) {
     : '<tr><td colspan="7" class="empty-copy">尚无 Cloudflare RUM 数据。</td></tr>';
 
   if (cloudflare?.status === 'not_configured') {
-    els.rumNote.textContent = 'Cloudflare GraphQL 尚未配置：需要在 Supabase Edge Function Secrets 中设置 CLOUDFLARE_ACCOUNT_ID 与 CLOUDFLARE_ANALYTICS_API_TOKEN。';
+    els.rumNote.textContent = 'Cloudflare GraphQL 尚未配置：需要在 Supabase Edge Function Secrets 中配置 Cloudflare Account ID 与只读 Analytics API Token。';
     els.rumNote.dataset.kind = 'error';
     return;
   }
