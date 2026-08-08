@@ -33,6 +33,10 @@ expect(overviewEdge.includes('stripeRequest("payouts?limit=5")'), 'Stripe payout
 expect(edge.includes('"REFUND"') && edge.includes('Type REFUND to confirm this financial action.'), 'Refunds must require typed confirmation');
 expect(edge.includes('"CANCEL"') && edge.includes('Type CANCEL to confirm subscription cancellation.'), 'Cancellations must require typed confirmation');
 expect(migration.includes('membership_admin_actions'), 'Audit table migration must be present');
+expect(migration.includes('sync_owner_pro_entitlements'), 'Owner role must automatically materialize product Pro access');
+expect(migration.includes("'owner'"), 'Owner grants must use an explicit owner source');
+expect(migration.includes("valid_until"), 'Owner Pro grants must support permanent access');
+expect(migration.includes("entitlement_code like '%.pro'"), 'Owner access must follow product Pro mappings');
 expect(denyMigration.includes('using (false)'), 'Browser roles must be explicitly denied');
 expect(!combinedBrowser.match(/sk_(?:live|test)_[A-Za-z0-9]/), 'Stripe secret must never be committed to the browser');
 expect(!combinedBrowser.includes('service_role'), 'Service-role credentials must never be referenced by the browser');
