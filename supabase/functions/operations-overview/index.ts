@@ -29,7 +29,12 @@ const GA4_PRODUCTS = [
   "notes",
   "ownly",
   "rhythmcoach",
+  "ccus_policy_hub",
 ] as const;
+
+const PUBLIC_GA4_PROPERTY_IDS: Record<string, string> = {
+  ccus_policy_hub: "549142391",
+};
 
 const RUM_PRODUCTS = [
   { product_code: "alpha_engine", name: "AlphaEngine", host: "liuh886.github.io", path_prefix: "/alpha_engine/" },
@@ -248,17 +253,22 @@ async function runGaReport(
 }
 
 function analyticsProperties(): Array<{ product_code: string; name: string; property_id: string }> {
-  const raw = Deno.env.get("GA4_PROPERTY_IDS") ?? "";
-  if (!raw) throw new Error("GA4_PROPERTY_IDS is not configured.");
-  const parsed = JSON.parse(raw) as Record<string, string>;
+  const raw = Deno.env.get("GA4_PROPERTY_IDS") ?? "{}";
+  let parsed: Record<string, string> = {};
+  try {
+    parsed = JSON.parse(raw) as Record<string, string>;
+  } catch {
+    throw new Error("GA4_PROPERTY_IDS must be valid JSON.");
+  }
+
   const rows = GA4_PRODUCTS
-    .filter((productCode) => /^\d+$/.test(String(parsed[productCode] ?? "")))
     .map((productCode) => ({
       product_code: productCode,
       name: PRODUCT_NAMES[productCode],
-      property_id: String(parsed[productCode]),
-    }));
-  if (!rows.length) throw new Error("GA4_PROPERTY_IDS contains no configured product properties.");
+      property_id: String(PUBLIC_GA4_PROPERTY_IDS[productCode] ?? parsed[productCode] ?? ""),
+    }))
+    .filter((property) => /^\d+$/.test(property.property_id));
+  if (!rows.length) throw new Error("No GA4 product properties are configured.");
   return rows;
 }
 

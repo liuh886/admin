@@ -26,6 +26,9 @@ expect(html.includes('id="platform-users"'), 'Supabase usage summary must be pre
 expect(html.includes('id="rum-rows"'), 'Cloudflare RUM product table must be present');
 expect(html.includes('id="traffic-rows"'), 'GA4 comparison table must be present');
 expect(html.includes('id="revenue-summary"'), 'Stripe revenue summary must be present');
+expect(operationsScript.includes("document.createElement('details')"), 'Detailed analytics must use native collapsible disclosures');
+expect(operationsScript.includes('applyCompactLayout()'), 'Compact operations hierarchy must be applied on load');
+expect(operationsCss.includes('.disclosure-panel') && operationsCss.includes('.metric-disclosure'), 'Collapsible analytics must have dedicated layout styles');
 expect(edge.includes('membership_admins'), 'Membership function must verify the admin whitelist');
 expect(overviewEdge.includes('membership_admins'), 'Overview function must verify the admin whitelist');
 expect(overviewEdge.includes('Administrator access is required.'), 'Unauthorized overview users must be rejected');
@@ -37,11 +40,12 @@ expect(overviewEdge.includes('rumWebVitalsEventsAdaptiveGroups'), 'Cloudflare We
 expect(overviewEdge.includes('dimensions { date requestHost requestPath siteTag }'), 'Cloudflare RUM must expose daily trend dimensions');
 expect(overviewEdge.includes('ccus_policy_hub') && overviewEdge.includes('/ccus-policy-hub/'), 'CCUS Policy Hub must be in the observability product map');
 expect(overviewEdge.includes('zhihaol.eu.org'), 'Notes custom hostname must be in the observability product map');
-expect(overviewEdge.includes('const GA4_PRODUCTS = [') && overviewEdge.includes('"alpha_engine"') && overviewEdge.includes('"ownly"') && overviewEdge.includes('"rhythmcoach"'), 'GA4 comparison must include the restored product properties');
-expect(!overviewEdge.match(/GA4_PRODUCTS[\s\S]{0,220}"ccus_policy_hub"/), 'CCUS must not gain a GA4 property without an explicit property configuration');
+expect(overviewEdge.includes('const GA4_PRODUCTS = [') && overviewEdge.includes('"alpha_engine"') && overviewEdge.includes('"ownly"') && overviewEdge.includes('"rhythmcoach"') && overviewEdge.includes('"ccus_policy_hub"'), 'GA4 comparison must include all seven product properties');
+expect(overviewEdge.includes('ccus_policy_hub: "549142391"'), 'CCUS GA4 property ID must be explicitly configured');
 expect(overviewEdge.includes('https://www.googleapis.com/auth/analytics.readonly'), 'GA4 access must remain read-only');
+expect(overviewEdge.includes('urn:ietf:params:oauth:grant-type:jwt-bearer'), 'Google service-account grant type must remain valid');
 expect(overviewEdge.includes('GA4_SERVICE_ACCOUNT_JSON_B64'), 'GA4 credentials must come from Supabase secrets');
-expect(overviewEdge.includes('GA4_PROPERTY_IDS'), 'GA4 property mapping must come from Supabase secrets');
+expect(overviewEdge.includes('GA4_PROPERTY_IDS'), 'Existing GA4 property mapping must remain available for the other products');
 expect(overviewEdge.includes('supabaseUsage(admin)'), 'Operations overview must include Supabase usage');
 expect(overviewEdge.includes('.from("product_accounts")'), 'Supabase usage must use product account activity');
 expect(overviewEdge.includes('.from("profiles")'), 'Supabase user growth must use shared profiles');

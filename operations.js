@@ -50,6 +50,57 @@ const els = {
   payoutList: $('#payout-list')
 };
 
+function disclosureSummary(title, subtitle) {
+  const summary = document.createElement('summary');
+  summary.innerHTML = `
+    <span class="disclosure-title"><strong>${title}</strong><span>${subtitle}</span></span>
+    <span class="disclosure-icon" aria-hidden="true">+</span>`;
+  return summary;
+}
+
+function collapsePanel(panel, title, subtitle) {
+  if (!panel || panel.tagName === 'DETAILS') return panel;
+  const details = document.createElement('details');
+  details.className = `${panel.className} disclosure-panel`;
+  const heading = panel.querySelector(':scope > .panel-heading');
+  if (heading) heading.remove();
+  details.appendChild(disclosureSummary(title, subtitle));
+  while (panel.firstChild) details.appendChild(panel.firstChild);
+  panel.replaceWith(details);
+  return details;
+}
+
+function applyCompactLayout() {
+  const overviewCopy = $('#business-overview .overview-heading > div > p:last-child');
+  if (overviewCopy) {
+    overviewCopy.textContent = '七个产品的 Cloudflare RUM、七个 GA4 Property 的一致对照、Supabase 用户使用与 Stripe Live Mode 只读汇总。';
+  }
+  if (els.ga4Scope) els.ga4Scope.textContent = '7 Properties';
+
+  const growthPanel = $('.growth-panel');
+  if (growthPanel && !growthPanel.querySelector('.metric-disclosure')) {
+    const chartWrap = growthPanel.querySelector('.growth-chart-wrap');
+    const axis = growthPanel.querySelector('.growth-axis');
+    const note = growthPanel.querySelector('#growth-note');
+    if (chartWrap && axis && note) {
+      const details = document.createElement('details');
+      details.className = 'metric-disclosure';
+      details.appendChild(disclosureSummary('30 日折线', '按需展开每日 Visits 趋势'));
+      chartWrap.before(details);
+      details.append(chartWrap, axis, note);
+    }
+  }
+
+  collapsePanel($('.momentum-panel'), '产品动量', '本 7 日 vs 前 7 日 · Cloudflare Visits');
+  const trafficPanels = [...document.querySelectorAll('.traffic-panel')];
+  const cloudflarePanel = trafficPanels.find((panel) => panel.querySelector('.eyebrow')?.textContent.includes('CLOUDFLARE WEB ANALYTICS'));
+  const ga4Panel = trafficPanels.find((panel) => panel.querySelector('.eyebrow')?.textContent.includes('GA4 · CROSS-PRODUCT'));
+  collapsePanel(cloudflarePanel, 'Cloudflare 流量与体验明细', '7 个产品 · 30 日 RUM');
+  collapsePanel(ga4Panel, 'GA4 统一站点分析对照', '7 个 Property · 用户、会话与互动');
+}
+
+applyCompactLayout();
+
 let loading = false;
 
 const escapeHtml = (value) => String(value ?? '')
@@ -269,7 +320,7 @@ function renderRum(cloudflare) {
     els.rumNote.dataset.kind = 'error';
     return;
   }
-  els.rumNote.textContent = 'Cloudflare 是七个产品的统一流量与真实用户体验口径；LCP / INP / CLS 显示 30 日 Good 事件占比，CCUS Policy Hub 只进入可观测层，不进入会员或 Stripe。';
+  els.rumNote.textContent = 'Cloudflare 是七个产品的统一流量与真实用户体验口径；LCP / INP / CLS 显示 30 日 Good 事件占比。';
   els.rumNote.dataset.kind = '';
 }
 
@@ -303,7 +354,7 @@ function renderTraffic(analytics) {
   const failed = properties.filter((property) => property.status !== 'ok');
   els.trafficNote.textContent = failed.length
     ? `${failed.length} 个 GA4 Property 查询失败：${failed.map((item) => `${item.name} · ${item.error}`).join('；')}`
-    : 'GA4 与 Cloudflare 保持两套互补口径：Cloudflare 负责统一流量/RUM baseline，GA4 负责站点行为、来源与跨产品一致对照。CCUS Policy Hub 暂无 GA4 Property。';
+    : 'GA4 与 Cloudflare 保持两套互补口径：Cloudflare 负责统一流量/RUM baseline，GA4 负责站点行为、来源与跨产品一致对照。';
   els.trafficNote.dataset.kind = failed.length ? 'error' : '';
 }
 
