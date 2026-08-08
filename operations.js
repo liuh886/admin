@@ -25,10 +25,25 @@ const els = {
   statViews: $('#overview-stat-views'),
   statProperties: $('#overview-stat-properties'),
   statPayments: $('#overview-stat-payments'),
+  growthChange: $('#growth-change'),
+  growthCurrent: $('#growth-current'),
+  growthPrevious: $('#growth-previous'),
+  growthChart: $('#growth-chart'),
+  growthStart: $('#growth-start'),
+  growthEnd: $('#growth-end'),
+  growthNote: $('#growth-note'),
+  momentumRows: $('#momentum-rows'),
+  platformUsers: $('#platform-users'),
+  platformNewUsers: $('#platform-new-users'),
+  platformActiveUsers: $('#platform-active-users'),
+  platformAccounts: $('#platform-accounts'),
+  platformProducts: $('#platform-products'),
+  platformNote: $('#platform-note'),
   rumRows: $('#rum-rows'),
   rumNote: $('#rum-note'),
   trafficRows: $('#traffic-rows'),
   trafficNote: $('#traffic-note'),
+  ga4Scope: $('#ga4-scope'),
   revenueSummary: $('#revenue-summary'),
   subscriptionSummary: $('#subscription-summary'),
   balanceSummary: $('#balance-summary'),
@@ -52,6 +67,13 @@ function formatPercent(value) {
   }).format(Number(value));
 }
 
+function formatRate(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '新数据';
+  return new Intl.NumberFormat('zh-CN', {
+    style: 'percent', maximumFractionDigits: 1, signDisplay: 'exceptZero'
+  }).format(Number(value));
+}
+
 function formatDuration(seconds) {
   const total = Math.max(0, Number(seconds || 0));
   if (total < 60) return `${formatNumber(total, 1)} 秒`;
@@ -71,6 +93,13 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('zh-CN', {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
   }).format(date);
+}
+
+function formatDay(value) {
+  if (!value) return '—';
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date);
 }
 
 function setStatus(message = '', kind = '') {
@@ -100,6 +129,97 @@ async function callOverview(forceRefresh = false) {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || `经营总览请求失败（${response.status}）`);
   return result;
+}
+
+function growthClass(changeRate) {
+  const value = Number(changeRate);
+  if (!Number.isFinite(value) || value === 0) return '';
+  return value > 0 ? 'positive' : 'negative';
+}
+
+function renderGrowthChart(points) {
+  if (!els.growthChart) return;
+  const values = points.map((point) => Number(point.visits || 0));
+  const max = Math.max(...values, 1);
+  const width = 720;
+  const height = 220;
+  const left = 18;
+  const right = 18;
+  const top = 18;
+  const bottom = 26;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const x = (index) => left + (points.length <= 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
+  const y = (value) => top + plotHeight - (Number(value || 0) / max) * plotHeight;
+  const line = points.map((point, index) => `${index ? 'L' : 'M'} ${x(index).toFixed(1)} ${y(point.visits).toFixed(1)}`).join(' ');
+  const area = points.length
+    ? `${line} L ${x(points.length - 1).toFixed(1)} ${(top + plotHeight).toFixed(1)} L ${x(0).toFixed(1)} ${(top + plotHeight).toFixed(1)} Z`
+    : '';
+  const grids = [0, 0.5, 1].map((ratio) => {
+    const gridY = top + plotHeight * ratio;
+    return `<line class="growth-grid-line" x1="${left}" y1="${gridY}" x2="${width - right}" y2="${gridY}"></line>`;
+  }).join('');
+  const last = points.at(-1);
+  const lastMark = last
+    ? `<circle class="growth-chart-dot" cx="${x(points.length - 1).toFixed(1)}" cy="${y(last.visits).toFixed(1)}" r="4"></circle>`
+    : '';
+  els.growthChart.innerHTML = `${grids}<path class="growth-chart-area" d="${area}"></path><path class="growth-chart-line" d="${line}"></path>${lastMark}`;
+  els.growthChart.setAttribute('aria-label', points.length
+    ? `过去 ${points.length} 日每日访问趋势，最高 ${formatNumber(max)}，最新 ${formatNumber(last?.visits)}。`
+    : '暂无访问趋势数据。');
+}
+
+function renderGrowth(cloudflare) {
+  const trend = cloudflare?.trend || {};
+  const daily = trend.daily || [];
+  const changeRate = trend.change_rate;
+  els.growthCurrent.textContent = formatNumber(trend.current_7d_visits);
+  els.growthPrevious.textContent = formatNumber(trend.previous_7d_visits);
+  els.growthChange.textContent = formatRate(changeRate);
+  els.growthChange.className = `trend-badge ${growthClass(changeRate)}`.trim();
+  els.growthStart.textContent = formatDay(daily[0]?.date);
+  els.growthEnd.textContent = formatDay(daily.at(-1)?.date);
+  renderGrowthChart(daily);
+
+  const momentum = cloudflare?.momentum || [];
+  els.momentumRows.innerHTML = momentum.length
+    ? momentum.map((item) => `
+      <tr>
+        <td><strong>${escapeHtml(item.name)}</strong></td>
+        <td>${formatNumber(item.current_7d_visits)}</td>
+        <td>${formatNumber(item.previous_7d_visits)}</td>
+        <td><span class="trend-value ${growthClass(item.change_rate)}">${escapeHtml(formatRate(item.change_rate))}</span></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" class="empty-copy">尚无足够的产品趋势数据。</td></tr>';
+
+  els.growthNote.textContent = cloudflare?.status === 'ok'
+    ? '统一采用 Cloudflare Visits 口径；“本 7 日”与紧邻的前 7 日比较。新接入站点在基期为 0 时显示“新数据”，不伪造增长率。'
+    : 'Cloudflare 趋势暂不可用。';
+}
+
+function renderPlatform(platform) {
+  if (platform?.status !== 'ok') {
+    els.platformUsers.textContent = '—';
+    els.platformNewUsers.textContent = '—';
+    els.platformActiveUsers.textContent = '—';
+    els.platformAccounts.textContent = '—';
+    els.platformProducts.innerHTML = '<span>Supabase 使用数据暂不可用</span>';
+    els.platformNote.textContent = platform?.error || '无法读取 Supabase 使用数据。';
+    els.platformNote.dataset.kind = 'error';
+    return;
+  }
+
+  const users = platform.users || {};
+  const accounts = platform.product_accounts || {};
+  els.platformUsers.textContent = formatNumber(users.total);
+  els.platformNewUsers.textContent = `+${formatNumber(users.new_7d)}`;
+  els.platformActiveUsers.textContent = formatNumber(users.active_7d);
+  els.platformAccounts.textContent = formatNumber(accounts.total);
+  els.platformProducts.innerHTML = (accounts.by_product || []).length
+    ? accounts.by_product.map((item) => `<span>${escapeHtml(item.name)} <strong>${formatNumber(item.users)}</strong></span>`).join('')
+    : '<span>尚无产品账户活动</span>';
+  els.platformNote.textContent = `最近账户活动 ${formatDate(accounts.latest_activity_at)} · 这里统计的是 Supabase 已登录用户与产品账户，不把匿名访问误算成注册转化。`;
+  els.platformNote.dataset.kind = '';
 }
 
 function rumHealth(product) {
@@ -140,7 +260,7 @@ function renderRum(cloudflare) {
     : '<tr><td colspan="7" class="empty-copy">尚无 Cloudflare RUM 数据。</td></tr>';
 
   if (cloudflare?.status === 'not_configured') {
-    els.rumNote.textContent = 'Cloudflare GraphQL 尚未配置：需要在 Supabase Edge Function Secrets 中配置 Cloudflare Account ID 与只读 Analytics API Token。';
+    els.rumNote.textContent = 'Cloudflare GraphQL 尚未配置：请检查服务端 Analytics 读取配置。';
     els.rumNote.dataset.kind = 'error';
     return;
   }
@@ -174,12 +294,16 @@ function renderTraffic(analytics) {
           <td><span class="badge ${property.status === 'ok' ? 'active' : 'failed'}">${property.status === 'ok' ? '正常' : '失败'}</span></td>
         </tr>`;
     }).join('')
-    : '<tr><td colspan="8" class="empty-copy">尚无 GA4 行为分析数据。</td></tr>';
+    : '<tr><td colspan="8" class="empty-copy">尚无 GA4 对照数据。</td></tr>';
 
+  const aggregate = analytics?.aggregate || {};
+  if (els.ga4Scope) {
+    els.ga4Scope.textContent = `${formatNumber(aggregate.reporting_properties)}/${formatNumber(aggregate.configured_properties)} Properties`;
+  }
   const failed = properties.filter((property) => property.status !== 'ok');
   els.trafficNote.textContent = failed.length
     ? `${failed.length} 个 GA4 Property 查询失败：${failed.map((item) => `${item.name} · ${item.error}`).join('；')}`
-    : 'GA4 仅保留在需要行为、漏斗或来源分析的 FlappyK、NewsFlow 与 Notes；不再作为全产品统一流量口径。';
+    : 'GA4 与 Cloudflare 保持两套互补口径：Cloudflare 负责统一流量/RUM baseline，GA4 负责站点行为、来源与跨产品一致对照。CCUS Policy Hub 暂无 GA4 Property。';
   els.trafficNote.dataset.kind = failed.length ? 'error' : '';
 }
 
@@ -227,6 +351,8 @@ function renderRevenue(stripe) {
 }
 
 function renderOverview(data) {
+  renderGrowth(data.cloudflare);
+  renderPlatform(data.platform);
   renderRum(data.cloudflare);
   renderTraffic(data.analytics);
   renderRevenue(data.stripe);
@@ -238,7 +364,7 @@ function renderOverview(data) {
 async function refreshOverview(forceRefresh = false) {
   if (loading) return;
   setLoading(true);
-  setStatus(forceRefresh ? '正在强制刷新 Cloudflare、GA4 与 Stripe…' : '正在载入 Cloudflare、GA4 与 Stripe 经营数据…');
+  setStatus(forceRefresh ? '正在强制刷新增长、Cloudflare、GA4、Supabase 与 Stripe…' : '正在载入增长与经营数据…');
   try {
     renderOverview(await callOverview(forceRefresh));
   } catch (error) {

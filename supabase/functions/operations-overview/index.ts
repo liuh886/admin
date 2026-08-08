@@ -10,6 +10,7 @@ const ANALYTICS_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const ANALYTICS_ENDPOINT = "https://analyticsdata.googleapis.com/v1beta";
 const CLOUDFLARE_GRAPHQL_ENDPOINT = "https://api.cloudflare.com/client/v4/graphql";
+const DAY_MS = 86_400_000;
 
 const PRODUCT_NAMES: Record<string, string> = {
   alpha_engine: "AlphaEngine",
@@ -21,7 +22,14 @@ const PRODUCT_NAMES: Record<string, string> = {
   ccus_policy_hub: "CCUS Policy Hub",
 };
 
-const GA4_BEHAVIOR_PRODUCTS = new Set(["flappyk", "newsflow", "notes"]);
+const GA4_PRODUCTS = [
+  "alpha_engine",
+  "flappyk",
+  "newsflow",
+  "notes",
+  "ownly",
+  "rhythmcoach",
+] as const;
 
 const RUM_PRODUCTS = [
   { product_code: "alpha_engine", name: "AlphaEngine", host: "liuh886.github.io", path_prefix: "/alpha_engine/" },
@@ -65,6 +73,12 @@ interface RumProductSummary {
   lcp_good_rate: number | null;
   inp_good_rate: number | null;
   cls_good_rate: number | null;
+}
+
+interface DailyTraffic {
+  date: string;
+  visits: number;
+  page_views: number;
 }
 
 let cachedOverview: CachedOverview | null = null;
@@ -237,14 +251,14 @@ function analyticsProperties(): Array<{ product_code: string; name: string; prop
   const raw = Deno.env.get("GA4_PROPERTY_IDS") ?? "";
   if (!raw) throw new Error("GA4_PROPERTY_IDS is not configured.");
   const parsed = JSON.parse(raw) as Record<string, string>;
-  const rows = Object.entries(parsed)
-    .filter(([productCode, propertyId]) => GA4_BEHAVIOR_PRODUCTS.has(productCode) && /^\d+$/.test(String(propertyId)))
-    .map(([productCode, propertyId]) => ({
+  const rows = GA4_PRODUCTS
+    .filter((productCode) => /^\d+$/.test(String(parsed[productCode] ?? "")))
+    .map((productCode) => ({
       product_code: productCode,
-      name: PRODUCT_NAMES[productCode] ?? productCode,
-      property_id: String(propertyId),
+      name: PRODUCT_NAMES[productCode],
+      property_id: String(parsed[productCode]),
     }));
-  if (!rows.length) throw new Error("GA4_PROPERTY_IDS contains no behavior-analytics properties.");
+  if (!rows.length) throw new Error("GA4_PROPERTY_IDS contains no configured product properties.");
   return rows;
 }
 
@@ -323,6 +337,30 @@ function emptyRumSummary(product: typeof RUM_PRODUCTS[number]): RumProductSummar
   };
 }
 
+function dateKey(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+function trafficDates(end: Date, days = 30): string[] {
+  const endDate = new Date(end);
+  endDate.setUTCHours(0, 0, 0, 0);
+  return Array.from({ length: days }, (_, index) => {
+    const value = new Date(endDate.getTime() - (days - 1 - index) * DAY_MS);
+    return dateKey(value);
+  });
+}
+
+function growthChange(current: number, previous: number): number | null {
+  if (previous <= 0) return current > 0 ? null : 0;
+  return (current - previous) / previous;
+}
+
+function trafficWindow(daily: DailyTraffic[]): { current: number; previous: number; change: number | null } {
+  const current = daily.slice(-7).reduce((sum, row) => sum + row.visits, 0);
+  const previous = daily.slice(-14, -7).reduce((sum, row) => sum + row.visits, 0);
+  return { current, previous, change: growthChange(current, previous) };
+}
+
 async function cloudflareGraphql(query: string, variables: Record<string, unknown>): Promise<Record<string, any>> {
   const apiToken = Deno.env.get("CLOUDFLARE_ANALYTICS_API_TOKEN") ?? "";
   if (!apiToken) throw new Error("CLOUDFLARE_ANALYTICS_API_TOKEN is not configured.");
@@ -342,37 +380,57 @@ async function cloudflareGraphql(query: string, variables: Record<string, unknow
   return payload;
 }
 
+function emptyCloudflare(status: "not_configured" | "error", error: string): Record<string, unknown> {
+  const dates = trafficDates(new Date());
+  return {
+    status,
+    error,
+    window_days: 30,
+    products: RUM_PRODUCTS.map(emptyRumSummary),
+    momentum: RUM_PRODUCTS.map((product) => ({
+      product_code: product.product_code,
+      name: product.name,
+      current_7d_visits: 0,
+      previous_7d_visits: 0,
+      change_rate: 0,
+    })),
+    trend: {
+      daily: dates.map((date) => ({ date, visits: 0, page_views: 0 })),
+      current_7d_visits: 0,
+      previous_7d_visits: 0,
+      change_rate: 0,
+    },
+    aggregate: {
+      reporting_products: 0,
+      configured_products: RUM_PRODUCTS.length,
+      page_views: 0,
+      visits: 0,
+    },
+  };
+}
+
 async function cloudflareOverview(): Promise<Record<string, unknown>> {
   const accountTag = (Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? "").trim();
   const apiToken = (Deno.env.get("CLOUDFLARE_ANALYTICS_API_TOKEN") ?? "").trim();
   if (!accountTag || !apiToken) {
-    return {
-      status: "not_configured",
-      error: "Cloudflare Analytics credentials are not configured.",
-      products: RUM_PRODUCTS.map(emptyRumSummary),
-      aggregate: {
-        reporting_products: 0,
-        configured_products: RUM_PRODUCTS.length,
-        page_views: 0,
-        visits: 0,
-      },
-    };
+    return emptyCloudflare("not_configured", "Cloudflare Analytics credentials are not configured.");
   }
 
   const end = new Date();
-  const start = new Date(end.getTime() - 30 * 86_400_000);
+  const dates = trafficDates(end);
+  const start = new Date(`${dates[0]}T00:00:00.000Z`);
   const query = `
     query OperationsRum($accountTag: string!, $start: Time!, $end: Time!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
           pageload: rumPageloadEventsAdaptiveGroups(
             limit: 10000
-            orderBy: [count_DESC]
+            orderBy: [date_ASC]
             filter: { datetime_geq: $start, datetime_leq: $end, bot: 0 }
           ) {
             count
             sum { visits }
-            dimensions { requestHost requestPath siteTag }
+            dimensions { date requestHost requestPath siteTag }
           }
           vitals: rumWebVitalsEventsAdaptiveGroups(
             limit: 10000
@@ -404,13 +462,36 @@ async function cloudflareOverview(): Promise<Record<string, unknown>> {
     const summaries = new Map<string, RumProductSummary>(
       RUM_PRODUCTS.map((product) => [product.product_code, emptyRumSummary(product)]),
     );
+    const overallDaily = new Map<string, DailyTraffic>(
+      dates.map((date) => [date, { date, visits: 0, page_views: 0 }]),
+    );
+    const productDaily = new Map<string, Map<string, DailyTraffic>>(
+      RUM_PRODUCTS.map((product) => [
+        product.product_code,
+        new Map(dates.map((date) => [date, { date, visits: 0, page_views: 0 }])),
+      ]),
+    );
 
     for (const row of account.pageload ?? []) {
       const product = rumProduct(row.dimensions?.requestHost, row.dimensions?.requestPath);
       if (!product) continue;
       const summary = summaries.get(product.product_code)!;
-      summary.page_views += Number(row.count ?? 0) || 0;
-      summary.visits += Number(row.sum?.visits ?? 0) || 0;
+      const pageViews = Number(row.count ?? 0) || 0;
+      const visits = Number(row.sum?.visits ?? 0) || 0;
+      summary.page_views += pageViews;
+      summary.visits += visits;
+
+      const date = String(row.dimensions?.date ?? "");
+      const overall = overallDaily.get(date);
+      const perProduct = productDaily.get(product.product_code)?.get(date);
+      if (overall) {
+        overall.page_views += pageViews;
+        overall.visits += visits;
+      }
+      if (perProduct) {
+        perProduct.page_views += pageViews;
+        perProduct.visits += visits;
+      }
     }
 
     for (const row of account.vitals ?? []) {
@@ -435,10 +516,31 @@ async function cloudflareOverview(): Promise<Record<string, unknown>> {
       return summary;
     });
 
+    const daily = dates.map((date) => overallDaily.get(date)!);
+    const totalWindow = trafficWindow(daily);
+    const momentum = RUM_PRODUCTS.map((product) => {
+      const rows = dates.map((date) => productDaily.get(product.product_code)!.get(date)!);
+      const window = trafficWindow(rows);
+      return {
+        product_code: product.product_code,
+        name: product.name,
+        current_7d_visits: window.current,
+        previous_7d_visits: window.previous,
+        change_rate: window.change,
+      };
+    }).sort((a, b) => b.current_7d_visits - a.current_7d_visits);
+
     return {
       status: "ok",
       window_days: 30,
       products,
+      momentum,
+      trend: {
+        daily,
+        current_7d_visits: totalWindow.current,
+        previous_7d_visits: totalWindow.previous,
+        change_rate: totalWindow.change,
+      },
       aggregate: {
         reporting_products: products.filter((product) => product.status === "ok").length,
         configured_products: products.length,
@@ -447,16 +549,72 @@ async function cloudflareOverview(): Promise<Record<string, unknown>> {
       },
     };
   } catch (error) {
+    return emptyCloudflare("error", error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function supabaseUsage(admin: ReturnType<typeof createClient>): Promise<Record<string, unknown>> {
+  try {
+    const [profilesResult, accountsResult] = await Promise.all([
+      admin.from("profiles").select("id,created_at,last_seen_at"),
+      admin.from("product_accounts").select("user_id,product_code,last_seen_at"),
+    ]);
+    if (profilesResult.error) throw profilesResult.error;
+    if (accountsResult.error) throw accountsResult.error;
+
+    const now = Date.now();
+    const sevenAgo = now - 7 * DAY_MS;
+    const thirtyAgo = now - 30 * DAY_MS;
+    const profiles = profilesResult.data ?? [];
+    const accounts = accountsResult.data ?? [];
+    const time = (value: unknown) => {
+      const parsed = Date.parse(String(value ?? ""));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const activeUsers = new Set<string>();
+    const byProduct = new Map<string, { users: Set<string>; latest: number }>();
+    let latestActivity = 0;
+    for (const row of accounts) {
+      const productCode = String(row.product_code ?? "unknown");
+      const userId = String(row.user_id ?? "");
+      const lastSeen = time(row.last_seen_at);
+      if (userId && lastSeen >= sevenAgo) activeUsers.add(userId);
+      latestActivity = Math.max(latestActivity, lastSeen);
+      const bucket = byProduct.get(productCode) ?? { users: new Set<string>(), latest: 0 };
+      if (userId) bucket.users.add(userId);
+      bucket.latest = Math.max(bucket.latest, lastSeen);
+      byProduct.set(productCode, bucket);
+    }
+
+    const latestSignup = profiles.reduce((latest, row) => Math.max(latest, time(row.created_at)), 0);
+    return {
+      status: "ok",
+      users: {
+        total: profiles.length,
+        new_7d: profiles.filter((row) => time(row.created_at) >= sevenAgo).length,
+        new_30d: profiles.filter((row) => time(row.created_at) >= thirtyAgo).length,
+        active_7d: activeUsers.size,
+        latest_signup_at: latestSignup ? new Date(latestSignup).toISOString() : null,
+      },
+      product_accounts: {
+        total: accounts.length,
+        products_with_accounts: byProduct.size,
+        latest_activity_at: latestActivity ? new Date(latestActivity).toISOString() : null,
+        by_product: [...byProduct.entries()]
+          .map(([product_code, bucket]) => ({
+            product_code,
+            name: PRODUCT_NAMES[product_code] ?? product_code,
+            users: bucket.users.size,
+            last_seen_at: bucket.latest ? new Date(bucket.latest).toISOString() : null,
+          }))
+          .sort((a, b) => b.users - a.users || a.name.localeCompare(b.name)),
+      },
+    };
+  } catch (error) {
     return {
       status: "error",
       error: error instanceof Error ? error.message : String(error),
-      products: RUM_PRODUCTS.map(emptyRumSummary),
-      aggregate: {
-        reporting_products: 0,
-        configured_products: RUM_PRODUCTS.length,
-        page_views: 0,
-        visits: 0,
-      },
     };
   }
 }
@@ -498,7 +656,7 @@ function moneyRows(input: unknown): Array<{ amount: number; currency: string; so
 }
 
 async function stripeOverview(admin: ReturnType<typeof createClient>): Promise<Record<string, unknown>> {
-  const createdGte = Math.floor((Date.now() - 30 * 86_400_000) / 1000);
+  const createdGte = Math.floor((Date.now() - 30 * DAY_MS) / 1000);
   const [charges, balance, payouts, subscriptionResult] = await Promise.all([
     listStripeCharges(createdGte),
     stripeRequest("balance"),
@@ -615,9 +773,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const [analytics, cloudflare, stripe] = await Promise.all([
+    const [analytics, cloudflare, platform, stripe] = await Promise.all([
       analyticsOverview(),
       cloudflareOverview(),
+      supabaseUsage(admin),
       stripeOverview(admin),
     ]);
     const payload = {
@@ -626,6 +785,7 @@ Deno.serve(async (req: Request) => {
       cached: false,
       cloudflare,
       analytics,
+      platform,
       stripe,
     };
     cachedOverview = {

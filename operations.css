@@ -28,6 +28,119 @@
 .overview-kpis span { color: var(--muted); font-size: 12px; }
 .overview-kpis strong { display: block; margin-top: 14px; font-size: 30px; letter-spacing: -.055em; }
 
+.growth-health-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, .75fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.growth-panel,
+.platform-panel { min-width: 0; }
+
+.growth-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.growth-summary > div,
+.platform-stat {
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(7, 9, 12, .28);
+}
+
+.growth-summary span,
+.platform-stat span { display: block; color: var(--muted); font-size: 10px; }
+.growth-summary strong,
+.platform-stat strong { display: block; margin-top: 6px; font-size: 20px; }
+
+.trend-badge,
+.trend-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.trend-badge {
+  align-self: center;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.trend-badge.positive,
+.trend-value.positive { color: var(--success); }
+.trend-badge.negative,
+.trend-value.negative { color: var(--danger); }
+
+.growth-chart-wrap {
+  min-height: 220px;
+  padding: 4px 0 0;
+}
+
+.growth-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 210px;
+  overflow: visible;
+}
+
+.growth-grid-line {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.growth-chart-area { fill: color-mix(in srgb, var(--accent) 12%, transparent); }
+.growth-chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.growth-chart-dot { fill: var(--accent); }
+
+.growth-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -8px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.platform-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.platform-products {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.platform-products span {
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.045);
+  color: var(--muted);
+  font-size: 10px;
+}
+.platform-products strong { color: var(--text); }
+
+.momentum-table { min-width: 560px; }
+.momentum-table td:first-child strong { display: block; }
+
 .overview-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(320px, .8fr);
@@ -128,6 +241,7 @@
 .payout-row span { color: var(--muted); font-size: 10px; }
 
 @media (max-width: 1050px) {
+  .growth-health-grid,
   .overview-grid { grid-template-columns: 1fr; }
 }
 
@@ -142,6 +256,10 @@
   .overview-kpis { gap: 8px; }
   .overview-kpis article { min-height: 92px; padding: 14px; }
   .overview-kpis strong { font-size: 25px; }
+  .growth-summary,
+  .platform-stats { grid-template-columns: 1fr 1fr; }
+  .growth-chart-wrap { min-height: 180px; }
+  .growth-chart { min-height: 170px; }
   .money-row dl { grid-template-columns: 1fr; }
   .subscription-overview { grid-template-columns: 1fr; }
   .product-counts { grid-column: auto; }
