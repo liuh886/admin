@@ -25,20 +25,12 @@ on public.rhythmcoach_personal_materials for select
 to authenticated
 using (
   (select auth.uid()) = user_id
-  and (
-    exists (
-      select 1 from public.entitlements e
-      where e.user_id = (select auth.uid())
-        and e.entitlement_code in ('rhythmcoach.pro', 'rhythmcoach.personal_library_cloud')
-        and e.active
-        and (e.valid_until is null or e.valid_until > now())
-    )
-    or exists (
-      select 1 from public.membership_admins a
-      where a.user_id = (select auth.uid())
-        and a.active
-        and a.role = 'owner'
-    )
+  and exists (
+    select 1 from public.entitlements e
+    where e.user_id = (select auth.uid())
+      and e.entitlement_code = 'rhythmcoach.pro'
+      and e.active
+      and (e.valid_until is null or e.valid_until > now())
   )
 );
 
@@ -48,20 +40,12 @@ on public.rhythmcoach_personal_materials for insert
 to authenticated
 with check (
   (select auth.uid()) = user_id
-  and (
-    exists (
-      select 1 from public.entitlements e
-      where e.user_id = (select auth.uid())
-        and e.entitlement_code in ('rhythmcoach.pro', 'rhythmcoach.personal_library_cloud')
-        and e.active
-        and (e.valid_until is null or e.valid_until > now())
-    )
-    or exists (
-      select 1 from public.membership_admins a
-      where a.user_id = (select auth.uid())
-        and a.active
-        and a.role = 'owner'
-    )
+  and exists (
+    select 1 from public.entitlements e
+    where e.user_id = (select auth.uid())
+      and e.entitlement_code = 'rhythmcoach.pro'
+      and e.active
+      and (e.valid_until is null or e.valid_until > now())
   )
 );
 
@@ -71,38 +55,22 @@ on public.rhythmcoach_personal_materials for update
 to authenticated
 using (
   (select auth.uid()) = user_id
-  and (
-    exists (
-      select 1 from public.entitlements e
-      where e.user_id = (select auth.uid())
-        and e.entitlement_code in ('rhythmcoach.pro', 'rhythmcoach.personal_library_cloud')
-        and e.active
-        and (e.valid_until is null or e.valid_until > now())
-    )
-    or exists (
-      select 1 from public.membership_admins a
-      where a.user_id = (select auth.uid())
-        and a.active
-        and a.role = 'owner'
-    )
+  and exists (
+    select 1 from public.entitlements e
+    where e.user_id = (select auth.uid())
+      and e.entitlement_code = 'rhythmcoach.pro'
+      and e.active
+      and (e.valid_until is null or e.valid_until > now())
   )
 )
 with check (
   (select auth.uid()) = user_id
-  and (
-    exists (
-      select 1 from public.entitlements e
-      where e.user_id = (select auth.uid())
-        and e.entitlement_code in ('rhythmcoach.pro', 'rhythmcoach.personal_library_cloud')
-        and e.active
-        and (e.valid_until is null or e.valid_until > now())
-    )
-    or exists (
-      select 1 from public.membership_admins a
-      where a.user_id = (select auth.uid())
-        and a.active
-        and a.role = 'owner'
-    )
+  and exists (
+    select 1 from public.entitlements e
+    where e.user_id = (select auth.uid())
+      and e.entitlement_code = 'rhythmcoach.pro'
+      and e.active
+      and (e.valid_until is null or e.valid_until > now())
   )
 );
 
@@ -112,23 +80,11 @@ on public.rhythmcoach_personal_materials for delete
 to authenticated
 using (
   (select auth.uid()) = user_id
-  and (
-    exists (
-      select 1 from public.entitlements e
-      where e.user_id = (select auth.uid())
-        and e.entitlement_code in ('rhythmcoach.pro', 'rhythmcoach.personal_library_cloud')
-        and e.active
-        and (e.valid_until is null or e.valid_until > now())
-    )
-    or exists (
-      select 1 from public.membership_admins a
-      where a.user_id = (select auth.uid())
-        and a.active
-        and a.role = 'owner'
-    )
+  and exists (
+    select 1 from public.entitlements e
+    where e.user_id = (select auth.uid())
+      and e.entitlement_code = 'rhythmcoach.pro'
+      and e.active
+      and (e.valid_until is null or e.valid_until > now())
   )
 );
-
-insert into public.billing_product_entitlements (product_code, entitlement_code)
-values ('rhythmcoach', 'rhythmcoach.personal_library_cloud')
-on conflict do nothing;
