@@ -63,13 +63,15 @@ function formatNumber(value, maximumFractionDigits = 0) {
 function formatPercent(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   return new Intl.NumberFormat('zh-CN', {
-    style: 'percent', maximumFractionDigits: 1, signDisplay: 'exceptZero'
+    style: 'percent', maximumFractionDigits: 1
   }).format(Number(value));
 }
 
 function formatRate(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '新数据';
-  return formatPercent(value);
+  return new Intl.NumberFormat('zh-CN', {
+    style: 'percent', maximumFractionDigits: 1, signDisplay: 'exceptZero'
+  }).format(Number(value));
 }
 
 function formatDuration(seconds) {
