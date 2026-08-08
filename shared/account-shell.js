@@ -6,6 +6,7 @@
 
   const TURNSTILE_SITE_KEY = '0x4AAAAAAEKVMnWa2valozxW';
   const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  const OAUTH_PROVIDERS = ['google', 'github', 'x'];
 
   const state = {
     client: null,
@@ -39,7 +40,8 @@
   const words = {
     zh: {
       account: '账户', shared: 'Hao Apps 共享账户', free: 'Free', pro: 'Pro', optional: '可选登录',
-      google: '使用 Google 登录', email: '邮箱地址', magic: '发送登录链接', sent: '登录链接已发送，请检查邮箱。',
+      google: '使用 Google 登录', github: '使用 GitHub 登录', x: '使用 X 登录',
+      email: '邮箱地址', magic: '发送登录链接', sent: '登录链接已发送，请检查邮箱。',
       close: '关闭账户', signOut: '退出登录', refresh: '刷新账户', save: '保存名称', displayName: '显示名称',
       signedIn: '已登录', loading: '正在加载…', unavailable: '账户服务暂时不可用，现有功能不受影响。',
       future: '未来能力', billingOff: '付费功能尚未开放。当前公开功能保持可用。', upgrade: '升级 · US$1/月', manage: '管理订阅',
@@ -51,7 +53,8 @@
     },
     en: {
       account: 'Account', shared: 'Shared Hao Apps account', free: 'Free', pro: 'Pro', optional: 'OPTIONAL SIGN-IN',
-      google: 'Continue with Google', email: 'Email address', magic: 'Send sign-in link', sent: 'Sign-in link sent. Check your inbox.',
+      google: 'Continue with Google', github: 'Continue with GitHub', x: 'Continue with X',
+      email: 'Email address', magic: 'Send sign-in link', sent: 'Sign-in link sent. Check your inbox.',
       close: 'Close account', signOut: 'Sign out', refresh: 'Refresh account', save: 'Save name', displayName: 'Display name',
       signedIn: 'Signed in', loading: 'Loading…', unavailable: 'Account service is temporarily unavailable. Existing features remain available.',
       future: 'Account capabilities', billingOff: 'Paid features are not open yet. Current public features remain available.', upgrade: 'Upgrade · US$1/month', manage: 'Manage subscription',
@@ -75,6 +78,8 @@
       crown: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 4.5 4L12 4l4.5 6L21 6l-2 12H5L3 6Z"/><path d="M5 21h14"/></svg>',
       close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>',
       google: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"/><path d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.61A10 10 0 0 0 12 22Z"/><path d="M6.39 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.12-1.32.31-1.93V7.46H3.04A10 10 0 0 0 2 12c0 1.61.39 3.13 1.04 4.54l3.35-2.61Z"/><path d="M12 5.94c1.47 0 2.79.5 3.83 1.49l2.87-2.87A9.64 9.64 0 0 0 12 2a10 10 0 0 0-8.96 5.46l3.35 2.61C7.18 7.7 9.39 5.94 12 5.94Z"/></svg>',
+      github: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3.3-.4 6.8-1.6 6.8-7A5.4 5.4 0 0 0 19.3 4 5 5 0 0 0 19.2.5S18 0 15 2a13.4 13.4 0 0 0-6 0C6 0 4.8.5 4.8.5A5 5 0 0 0 4.7 4a5.4 5.4 0 0 0-1.5 3.7c0 5.4 3.5 6.6 6.8 7A4.8 4.8 0 0 0 9 18v4"/><path d="M9 18c-5 .8-5-2.5-7-3"/></svg>',
+      x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4l14 16M19 4 5 20"/></svg>',
       mail: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
       refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.4-2L20 9M4 15l2.5 2a7 7 0 0 0 11.4-2"/></svg>',
       logout: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg>',
@@ -279,14 +284,15 @@
     return snapshot();
   }
 
-  async function signInWithGoogle() {
+  async function signInWithProvider(provider) {
+    if (!OAUTH_PROVIDERS.includes(provider)) return;
     state.loading = true;
     state.error = '';
     render();
     try {
       const client = await getClient();
       const { error } = await client.auth.signInWithOAuth({
-        provider: 'google',
+        provider,
         options: { redirectTo: config.redirectUrl || window.location.href },
       });
       if (error) throw error;
@@ -563,12 +569,19 @@
       const badge = document.createElement('span');
       badge.className = 'hao-account-status-chip';
       badge.textContent = t.optional;
-      const google = document.createElement('button');
-      google.type = 'button';
-      google.className = 'hao-account-primary';
-      google.innerHTML = `${icon('google')}<span>${state.loading ? t.loading : t.google}</span>`;
-      google.disabled = state.loading;
-      google.addEventListener('click', () => void signInWithGoogle());
+      const providerButtons = [
+        ['google', t.google, 'hao-account-primary'],
+        ['github', t.github, ''],
+        ['x', t.x, ''],
+      ].map(([provider, label, className]) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        if (className) button.className = className;
+        button.innerHTML = `${icon(provider)}<span>${state.loading ? t.loading : label}</span>`;
+        button.disabled = state.loading;
+        button.addEventListener('click', () => void signInWithProvider(provider));
+        return button;
+      });
       const divider = document.createElement('div');
       divider.className = 'hao-account-divider';
       divider.textContent = 'OR';
@@ -589,7 +602,7 @@
       turnstileHost.className = 'hao-account-turnstile';
       turnstileHost.style.minHeight = '65px';
       turnstileHost.style.overflow = 'hidden';
-      guest.append(badge, google, divider, form, turnstileHost);
+      guest.append(badge, ...providerButtons, divider, form, turnstileHost);
       dialog.appendChild(guest);
     } else {
       const account = document.createElement('div');
@@ -804,6 +817,7 @@
     open,
     close,
     refresh,
+    signInWithProvider,
     can: (code) => state.entitlements.has(String(code || '')),
     getClient,
     saveProductData,
