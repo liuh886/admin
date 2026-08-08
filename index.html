@@ -43,8 +43,8 @@
       <section class="hero-row">
         <div>
           <p class="eyebrow">LIVE OPERATIONS CONTROL</p>
-          <h2>访问、体验、收入与会员，集中在一个可信入口。</h2>
-          <p>Cloudflare RUM 是全产品观测底座；GA4 只承担需要行为分析的产品；Stripe 与会员写操作继续通过受保护的 Supabase Edge Function。</p>
+          <h2>增长、体验、收入与会员，集中在一个可信入口。</h2>
+          <p>Cloudflare RUM 提供七个产品统一的流量与体验 baseline；GA4 作为第二套互补站点分析口径；Supabase 与 Stripe 继续承担账户、会员和收入事实。</p>
         </div>
         <span class="live-pill"><i></i> Live mode</span>
       </section>
@@ -59,9 +59,9 @@
       <section id="business-overview" class="business-overview" aria-labelledby="business-overview-title">
         <div class="section-heading overview-heading">
           <div>
-            <p class="eyebrow">OBSERVABILITY & REVENUE</p>
+            <p class="eyebrow">GROWTH · OBSERVABILITY · REVENUE</p>
             <h2 id="business-overview-title">经营总览</h2>
-            <p>七个产品的 Cloudflare RUM、三项 GA4 行为分析与 Stripe Live Mode 只读汇总。</p>
+            <p>七个产品的 Cloudflare RUM、六个已有 GA4 Property 的一致对照、Supabase 用户使用与 Stripe Live Mode 只读汇总。</p>
           </div>
           <button id="overview-refresh" class="button ghost compact" type="button">刷新数据</button>
         </div>
@@ -73,6 +73,54 @@
           <article><span>正常上报产品</span><strong id="overview-stat-properties">—</strong></article>
           <article><span>30 日成功付款</span><strong id="overview-stat-payments">—</strong></article>
         </section>
+
+        <div class="growth-health-grid">
+          <article class="panel growth-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">GROWTH · CLOUDFLARE</p><h3>30 日访问趋势</h3></div>
+              <span id="growth-change" class="trend-badge">—</span>
+            </div>
+            <div class="growth-summary" aria-label="访问增长比较">
+              <div><span>本 7 日 Visits</span><strong id="growth-current">—</strong></div>
+              <div><span>前 7 日 Visits</span><strong id="growth-previous">—</strong></div>
+            </div>
+            <div class="growth-chart-wrap">
+              <svg id="growth-chart" class="growth-chart" viewBox="0 0 720 220" role="img" aria-label="30 日访问趋势"></svg>
+            </div>
+            <div class="growth-axis" aria-hidden="true"><span id="growth-start">—</span><span id="growth-end">—</span></div>
+            <p id="growth-note" class="overview-note"></p>
+          </article>
+
+          <article class="panel platform-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">SUPABASE · USAGE</p><h3>用户与应用数据</h3></div>
+              <span class="subtle">Authenticated</span>
+            </div>
+            <div class="platform-stats">
+              <div class="platform-stat"><span>注册用户</span><strong id="platform-users">—</strong></div>
+              <div class="platform-stat"><span>近 7 日新增</span><strong id="platform-new-users">—</strong></div>
+              <div class="platform-stat"><span>近 7 日活跃</span><strong id="platform-active-users">—</strong></div>
+              <div class="platform-stat"><span>产品账户记录</span><strong id="platform-accounts">—</strong></div>
+            </div>
+            <div id="platform-products" class="platform-products"></div>
+            <p id="platform-note" class="overview-note"></p>
+          </article>
+        </div>
+
+        <article class="panel momentum-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">PRODUCT MOMENTUM</p><h3>产品动量</h3></div>
+            <span class="subtle">本 7 日 vs 前 7 日 · Cloudflare Visits</span>
+          </div>
+          <div class="table-scroll">
+            <table class="traffic-table momentum-table">
+              <thead>
+                <tr><th>产品</th><th>本 7 日</th><th>前 7 日</th><th>变化</th></tr>
+              </thead>
+              <tbody id="momentum-rows"><tr><td colspan="4" class="empty-copy">正在载入产品趋势…</td></tr></tbody>
+            </table>
+          </div>
+        </article>
 
         <article class="panel traffic-panel">
           <div class="panel-heading">
@@ -103,8 +151,8 @@
         <div class="overview-grid">
           <article class="panel traffic-panel">
             <div class="panel-heading">
-              <div><p class="eyebrow">PRODUCT BEHAVIOR · GA4</p><h3>行为分析补充</h3></div>
-              <span class="subtle">FlappyK · NewsFlow · Notes</span>
+              <div><p class="eyebrow">GA4 · CROSS-PRODUCT</p><h3>统一站点分析对照</h3></div>
+              <span id="ga4-scope" class="subtle">6 Properties</span>
             </div>
             <div class="table-scroll">
               <table class="traffic-table">
@@ -121,7 +169,7 @@
                   </tr>
                 </thead>
                 <tbody id="traffic-rows">
-                  <tr><td colspan="8" class="empty-copy">正在载入 GA4 行为数据…</td></tr>
+                  <tr><td colspan="8" class="empty-copy">正在载入 GA4 对照数据…</td></tr>
                 </tbody>
               </table>
             </div>
