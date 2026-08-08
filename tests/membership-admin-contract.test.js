@@ -20,11 +20,20 @@ expect(!combinedBrowser.includes('https://liuh886.github.io/FlappyK/admin/'), 'L
 expect(script.includes('/functions/v1/membership-admin'), 'Frontend must call the protected admin function');
 expect(operationsScript.includes('/functions/v1/operations-overview'), 'Frontend must call the protected overview function');
 expect(html.includes('id="business-overview"'), 'Traffic and revenue overview must be present');
-expect(html.includes('id="traffic-rows"'), 'GA4 property table must be present');
+expect(html.includes('id="rum-rows"'), 'Cloudflare RUM product table must be present');
+expect(html.includes('id="traffic-rows"'), 'GA4 behavior table must be present');
 expect(html.includes('id="revenue-summary"'), 'Stripe revenue summary must be present');
 expect(edge.includes('membership_admins'), 'Membership function must verify the admin whitelist');
 expect(overviewEdge.includes('membership_admins'), 'Overview function must verify the admin whitelist');
 expect(overviewEdge.includes('Administrator access is required.'), 'Unauthorized overview users must be rejected');
+expect(overviewEdge.includes('https://api.cloudflare.com/client/v4/graphql'), 'Cloudflare observability must use the GraphQL Analytics API');
+expect(overviewEdge.includes('CLOUDFLARE_ACCOUNT_ID'), 'Cloudflare account scope must come from Supabase secrets');
+expect(overviewEdge.includes('CLOUDFLARE_ANALYTICS_API_TOKEN'), 'Cloudflare read token must come from Supabase secrets');
+expect(overviewEdge.includes('rumPageloadEventsAdaptiveGroups'), 'Cloudflare page-load RUM must be queried');
+expect(overviewEdge.includes('rumWebVitalsEventsAdaptiveGroups'), 'Cloudflare Web Vitals RUM must be queried');
+expect(overviewEdge.includes('ccus_policy_hub') && overviewEdge.includes('/ccus-policy-hub/'), 'CCUS Policy Hub must be in the observability product map');
+expect(overviewEdge.includes('zhihaol.eu.org'), 'Notes custom hostname must be in the observability product map');
+expect(overviewEdge.includes('new Set(["flappyk", "newsflow", "notes"])'), 'GA4 must be limited to behavior-analytics products');
 expect(overviewEdge.includes('https://www.googleapis.com/auth/analytics.readonly'), 'GA4 access must remain read-only');
 expect(overviewEdge.includes('GA4_SERVICE_ACCOUNT_JSON_B64'), 'GA4 credentials must come from Supabase secrets');
 expect(overviewEdge.includes('GA4_PROPERTY_IDS'), 'GA4 property mapping must come from Supabase secrets');
@@ -42,5 +51,6 @@ expect(!combinedBrowser.match(/sk_(?:live|test)_[A-Za-z0-9]/), 'Stripe secret mu
 expect(!combinedBrowser.includes('service_role'), 'Service-role credentials must never be referenced by the browser');
 expect(!combinedBrowser.includes('private_key'), 'Google service-account private key must never enter the browser');
 expect(!combinedBrowser.includes('GA4_SERVICE_ACCOUNT_JSON_B64'), 'GA4 server secret name must not be exposed by the browser');
+expect(!combinedBrowser.includes('CLOUDFLARE_ANALYTICS_API_TOKEN'), 'Cloudflare API-token secret name must not be exposed by the browser');
 
 console.log('Membership and operations admin contract checks passed');
