@@ -4,6 +4,9 @@
   const config = window.HaoAccountConfig || window.HaoMembershipConfig || {};
   if (!config.enabled) return;
 
+  const TURNSTILE_SITE_KEY = '0x4AAAAAAEKVMnWa2valozxW';
+  const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+
   const state = {
     client: null,
     session: null,
@@ -21,6 +24,9 @@
   let triggerHost = null;
   let overlayHost = null;
   let mountObserver = null;
+  let turnstileLoader = null;
+  let turnstileWidgetId = null;
+  let captchaToken = '';
 
   const currentLanguage = () => {
     if (config.language === 'zh' || config.language === 'en') return config.language;
@@ -41,6 +47,7 @@
       general: '一般反馈', idea: '功能建议', bug: '问题报告', content: '内容反馈', other: '其他',
       message: '反馈内容', submit: '发送反馈', feedbackSent: '反馈已收到，谢谢。', profileSaved: '账户名称已保存。',
       privacy: '隐私与数据边界', cloudReady: '账户已连接', cloudGuest: '登录后启用账户能力',
+      captchaRequired: '请先完成人机验证。', captchaUnavailable: '人机验证暂时不可用，请稍后重试。',
     },
     en: {
       account: 'Account', shared: 'Shared Hao Apps account', free: 'Free', pro: 'Pro', optional: 'OPTIONAL SIGN-IN',
@@ -52,6 +59,7 @@
       general: 'General', idea: 'Feature idea', bug: 'Bug report', content: 'Content feedback', other: 'Other',
       message: 'Your feedback', submit: 'Send feedback', feedbackSent: 'Feedback received. Thank you.', profileSaved: 'Account name saved.',
       privacy: 'Privacy and data boundary', cloudReady: 'Account connected', cloudGuest: 'Sign in to enable account features',
+      captchaRequired: 'Complete the security check first.', captchaUnavailable: 'The security check is temporarily unavailable. Try again shortly.',
     },
   };
 
@@ -75,6 +83,78 @@
     };
     return icons[name] || '';
   };
+
+  function clearTurnstile() {
+    if (turnstileWidgetId !== null && window.turnstile?.remove) {
+      try { window.turnstile.remove(turnstileWidgetId); } catch { /* stale widget is already gone */ }
+    }
+    turnstileWidgetId = null;
+    captchaToken = '';
+  }
+
+  function loadTurnstile() {
+    if (window.turnstile?.render) return Promise.resolve(window.turnstile);
+    if (turnstileLoader) return turnstileLoader;
+
+    turnstileLoader = new Promise((resolve, reject) => {
+      let script = document.querySelector('script[data-hao-turnstile]');
+      const finish = () => {
+        if (window.turnstile?.render) resolve(window.turnstile);
+        else reject(new Error('Turnstile API did not initialize.'));
+      };
+      const fail = () => reject(new Error('Turnstile API failed to load.'));
+
+      if (!script) {
+        script = document.createElement('script');
+        script.src = TURNSTILE_SCRIPT_URL;
+        script.async = true;
+        script.defer = true;
+        script.dataset.haoTurnstile = '';
+        document.head.appendChild(script);
+      }
+      script.addEventListener('load', finish, { once: true });
+      script.addEventListener('error', fail, { once: true });
+      if (window.turnstile?.render) finish();
+    }).catch((error) => {
+      turnstileLoader = null;
+      throw error;
+    });
+
+    return turnstileLoader;
+  }
+
+  async function mountTurnstile(container, submitButton) {
+    try {
+      const turnstile = await loadTurnstile();
+      if (!container.isConnected || !state.open || state.user) return;
+      clearTurnstile();
+      submitButton.disabled = true;
+      turnstileWidgetId = turnstile.render(container, {
+        sitekey: TURNSTILE_SITE_KEY,
+        theme: 'auto',
+        callback(token) {
+          captchaToken = String(token || '');
+          submitButton.disabled = state.loading || !captchaToken;
+        },
+        'expired-callback'() {
+          captchaToken = '';
+          submitButton.disabled = true;
+        },
+        'error-callback'() {
+          captchaToken = '';
+          submitButton.disabled = true;
+        },
+      });
+    } catch (error) {
+      if (!container.isConnected) return;
+      submitButton.disabled = true;
+      const message = document.createElement('span');
+      message.className = 'hao-account-captcha-error';
+      message.textContent = text().captchaUnavailable;
+      container.replaceChildren(message);
+      console.warn('Hao Account Turnstile unavailable:', error);
+    }
+  }
 
   function snapshot() {
     return Object.freeze({
@@ -217,9 +297,15 @@
     }
   }
 
-  async function sendMagicLink(email) {
+  async function sendMagicLink(email, token) {
     const normalized = String(email || '').trim();
     if (!/^\S+@\S+\.\S+$/.test(normalized)) return;
+    const verifiedToken = String(token || '').trim();
+    if (!verifiedToken) {
+      state.error = text().captchaRequired;
+      render();
+      return;
+    }
     state.loading = true;
     state.error = '';
     render();
@@ -227,7 +313,11 @@
       const client = await getClient();
       const { error } = await client.auth.signInWithOtp({
         email: normalized,
-        options: { emailRedirectTo: config.redirectUrl || window.location.href, shouldCreateUser: true },
+        options: {
+          emailRedirectTo: config.redirectUrl || window.location.href,
+          shouldCreateUser: true,
+          captchaToken: verifiedToken,
+        },
       });
       if (error) throw error;
       state.notice = text().sent;
@@ -364,6 +454,7 @@
 
   function close() {
     state.open = false;
+    clearTurnstile();
     render();
     document.documentElement.classList.remove('hao-account-open');
     triggerHost?.querySelector('button')?.focus();
@@ -423,10 +514,13 @@
     const t = text();
     const signedIn = Boolean(state.user);
     const isPro = state.entitlements.has(config.entitlementCode);
+    clearTurnstile();
     overlayHost.hidden = !state.open;
     overlayHost.innerHTML = '';
     if (!state.open) return;
 
+    let turnstileHost = null;
+    let magicLinkButton = null;
     const backdrop = document.createElement('div');
     backdrop.className = 'hao-account-backdrop';
     const dialog = document.createElement('section');
@@ -484,12 +578,18 @@
       const input = form.querySelector('input');
       input.placeholder = t.email;
       input.setAttribute('aria-label', t.email);
-      form.querySelector('button').textContent = t.magic;
+      magicLinkButton = form.querySelector('button');
+      magicLinkButton.textContent = t.magic;
+      magicLinkButton.disabled = true;
       form.addEventListener('submit', (event) => {
         event.preventDefault();
-        void sendMagicLink(input.value);
+        void sendMagicLink(input.value, captchaToken);
       });
-      guest.append(badge, google, divider, form);
+      turnstileHost = document.createElement('div');
+      turnstileHost.className = 'hao-account-turnstile';
+      turnstileHost.style.minHeight = '65px';
+      turnstileHost.style.overflow = 'hidden';
+      guest.append(badge, google, divider, form, turnstileHost);
       dialog.appendChild(guest);
     } else {
       const account = document.createElement('div');
@@ -619,6 +719,7 @@
     backdrop.appendChild(dialog);
     backdrop.addEventListener('mousedown', (event) => { if (event.target === backdrop) close(); });
     overlayHost.appendChild(backdrop);
+    if (turnstileHost && magicLinkButton) void mountTurnstile(turnstileHost, magicLinkButton);
   }
 
   function render() {
