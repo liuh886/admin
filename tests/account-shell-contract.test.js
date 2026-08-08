@@ -29,7 +29,15 @@ for (const required of [
   expect(script.includes(required), `Shared account shell is missing ${required}`);
 }
 
-expect(script.includes("provider: 'google'"), 'Google must remain the primary OAuth provider');
+for (const provider of ['google', 'github', 'x']) {
+  expect(script.includes(`'${provider}'`), `Shared account shell must include the ${provider} OAuth provider`);
+}
+expect(script.includes("const OAUTH_PROVIDERS = ['google', 'github', 'x']"), 'OAuth provider list must stay explicit and minimal');
+expect(script.includes('async function signInWithProvider(provider)'), 'OAuth sign-in must use one provider function');
+expect(script.includes('signInWithProvider,'), 'Shared account API must expose provider sign-in');
+expect(script.includes('Continue with GitHub'), 'GitHub sign-in copy must be present');
+expect(script.includes('Continue with X'), 'X sign-in copy must be present');
+expect(!script.includes("provider: 'twitter'"), 'Legacy Twitter OAuth provider must not be used');
 expect(script.includes("flowType: 'pkce'"), 'Browser auth must use PKCE');
 expect(script.includes('persistSession: true'), 'Account sessions must persist across Hao Apps on the shared origin');
 expect(script.includes("config.billingEnabled"), 'Paid actions must remain controlled by the product config');
@@ -74,4 +82,4 @@ for (const forbidden of [
   expect(!forbidden.test(browser), `Shared browser assets contain forbidden secret material: ${forbidden}`);
 }
 
-console.log('Shared account shell requires embedded mounts, Turnstile-protected email auth, and exposes no privileged secret.');
+console.log('Shared account shell supports Google, GitHub and X OAuth, Turnstile-protected email auth, and exposes no privileged secret.');
