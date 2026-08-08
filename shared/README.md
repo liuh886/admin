@@ -57,6 +57,6 @@ The shared browser client may write only:
 - authenticated product feedback;
 - app-specific tables protected by their own RLS policies.
 
-Do not upload local-first content through `product_accounts`. Ownly Markdown, RhythmCoach recordings and scripts, and AlphaEngine local research bundles remain outside the shared account store.
+Do not upload content through `product_accounts`. Product content that genuinely needs cloud sync must use an app-specific RLS table with an explicit product contract. RhythmCoach follows this rule: only Personal Library **text materials** may sync through `rhythmcoach_personal_materials`; RhythmCoach audio recordings are always local-only and are never uploaded or stored online. Ownly Markdown and AlphaEngine local research bundles remain local-first unless their products explicitly define a separate RLS-backed cloud feature.
 
 Never place Stripe secrets, webhook secrets, Supabase secret/service-role keys, database passwords or Google service-account credentials in product configuration or browser assets.
