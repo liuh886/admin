@@ -1,11 +1,12 @@
 (() => {
   'use strict';
 
-  const config = window.HaoAccountConfig || window.HaoMembershipConfig || {};
+  const config = window.HaoAccountConfig || {};
   if (!config.enabled) return;
 
   const TURNSTILE_SITE_KEY = '0x4AAAAAAEKVMnWa2valozxW';
   const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  const OAUTH_PROVIDERS = new Set(['google', 'github', 'x']);
 
   const state = {
     client: null,
@@ -39,27 +40,27 @@
   const words = {
     zh: {
       account: '账户', shared: 'Hao Apps 共享账户', free: 'Free', pro: 'Pro', optional: '可选登录',
-      google: '使用 Google 登录', email: '邮箱地址', magic: '发送登录链接', sent: '登录链接已发送，请检查邮箱。',
+      google: '使用 Google 登录', github: '使用 GitHub 登录', x: '使用 X 登录', or: '或',
+      email: '邮箱地址', magic: '发送登录链接', sent: '登录链接已发送，请检查邮箱。',
       close: '关闭账户', signOut: '退出登录', refresh: '刷新账户', save: '保存名称', displayName: '显示名称',
-      signedIn: '已登录', loading: '正在加载…', unavailable: '账户服务暂时不可用，现有功能不受影响。',
-      future: '未来能力', billingOff: '付费功能尚未开放。当前公开功能保持可用。', upgrade: '升级 · US$1/月', manage: '管理订阅',
+      signedIn: '已登录', loading: '正在加载…', unavailable: '账户服务暂时不可用，请稍后重试。',
+      future: '账户能力', billingOff: '付费功能尚未开放。当前公开功能保持可用。', upgrade: '升级 · US$1/月', manage: '管理订阅',
       feedback: '提交反馈', feedbackPrompt: '告诉我哪些内容有帮助、哪里需要改进。', category: '反馈类型',
       general: '一般反馈', idea: '功能建议', bug: '问题报告', content: '内容反馈', other: '其他',
       message: '反馈内容', submit: '发送反馈', feedbackSent: '反馈已收到，谢谢。', profileSaved: '账户名称已保存。',
-      privacy: '隐私与数据边界', cloudReady: '账户已连接', cloudGuest: '登录后启用账户能力',
-      captchaRequired: '请先完成人机验证。', captchaUnavailable: '人机验证暂时不可用，请稍后重试。',
+      privacy: '隐私与数据边界', captchaRequired: '请先完成人机验证。', captchaUnavailable: '人机验证暂时不可用，请稍后重试。',
     },
     en: {
       account: 'Account', shared: 'Shared Hao Apps account', free: 'Free', pro: 'Pro', optional: 'OPTIONAL SIGN-IN',
-      google: 'Continue with Google', email: 'Email address', magic: 'Send sign-in link', sent: 'Sign-in link sent. Check your inbox.',
+      google: 'Continue with Google', github: 'Continue with GitHub', x: 'Continue with X', or: 'OR',
+      email: 'Email address', magic: 'Send sign-in link', sent: 'Sign-in link sent. Check your inbox.',
       close: 'Close account', signOut: 'Sign out', refresh: 'Refresh account', save: 'Save name', displayName: 'Display name',
-      signedIn: 'Signed in', loading: 'Loading…', unavailable: 'Account service is temporarily unavailable. Existing features remain available.',
+      signedIn: 'Signed in', loading: 'Loading…', unavailable: 'Account service is temporarily unavailable. Try again shortly.',
       future: 'Account capabilities', billingOff: 'Paid features are not open yet. Current public features remain available.', upgrade: 'Upgrade · US$1/month', manage: 'Manage subscription',
       feedback: 'Send feedback', feedbackPrompt: 'Tell us what helped and what should improve.', category: 'Feedback type',
       general: 'General', idea: 'Feature idea', bug: 'Bug report', content: 'Content feedback', other: 'Other',
       message: 'Your feedback', submit: 'Send feedback', feedbackSent: 'Feedback received. Thank you.', profileSaved: 'Account name saved.',
-      privacy: 'Privacy and data boundary', cloudReady: 'Account connected', cloudGuest: 'Sign in to enable account features',
-      captchaRequired: 'Complete the security check first.', captchaUnavailable: 'The security check is temporarily unavailable. Try again shortly.',
+      privacy: 'Privacy and data boundary', captchaRequired: 'Complete the security check first.', captchaUnavailable: 'The security check is temporarily unavailable. Try again shortly.',
     },
   };
 
@@ -75,6 +76,8 @@
       crown: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 4.5 4L12 4l4.5 6L21 6l-2 12H5L3 6Z"/><path d="M5 21h14"/></svg>',
       close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>',
       google: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"/><path d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.61A10 10 0 0 0 12 22Z"/><path d="M6.39 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.12-1.32.31-1.93V7.46H3.04A10 10 0 0 0 2 12c0 1.61.39 3.13 1.04 4.54l3.35-2.61Z"/><path d="M12 5.94c1.47 0 2.79.5 3.83 1.49l2.87-2.87A9.64 9.64 0 0 0 12 2a10 10 0 0 0-8.96 5.46l3.35 2.61C7.18 7.7 9.39 5.94 12 5.94Z"/></svg>',
+      github: '<svg viewBox="0 0 24 24" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.55 9.55 0 0 1 12 7.01c.85 0 1.71.11 2.51.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.86v2.57c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>',
+      x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="M4.2 3h4.6l4.2 5.6L17.8 3h2l-5.9 7.1L21 21h-4.6l-4.7-6.3L6.2 21h-2l6.6-7.8L4.2 3Zm3.6 1.7H7.5l9.8 14.6h1.2L8.8 4.7Z"/></svg>',
       mail: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
       refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.4-2L20 9M4 15l2.5 2a7 7 0 0 0 11.4-2"/></svg>',
       logout: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg>',
@@ -84,9 +87,14 @@
     return icons[name] || '';
   };
 
+  function setError(error) {
+    state.error = error?.message || String(error || 'Unknown error');
+    console.warn('Hao Account:', error);
+  }
+
   function clearTurnstile() {
     if (turnstileWidgetId !== null && window.turnstile?.remove) {
-      try { window.turnstile.remove(turnstileWidgetId); } catch { /* stale widget is already gone */ }
+      try { window.turnstile.remove(turnstileWidgetId); } catch { /* widget is already gone */ }
     }
     turnstileWidgetId = null;
     captchaToken = '';
@@ -98,10 +106,9 @@
 
     turnstileLoader = new Promise((resolve, reject) => {
       let script = document.querySelector('script[data-hao-turnstile]');
-      const finish = () => {
-        if (window.turnstile?.render) resolve(window.turnstile);
-        else reject(new Error('Turnstile API did not initialize.'));
-      };
+      const finish = () => window.turnstile?.render
+        ? resolve(window.turnstile)
+        : reject(new Error('Turnstile API did not initialize.'));
       const fail = () => reject(new Error('Turnstile API failed to load.'));
 
       if (!script) {
@@ -173,7 +180,7 @@
   function emit() {
     const detail = snapshot();
     listeners.forEach((listener) => {
-      try { listener(detail); } catch { /* consumer error does not break auth */ }
+      try { listener(detail); } catch { /* consumer errors do not break auth */ }
     });
     window.dispatchEvent(new CustomEvent('hao:account-changed', { detail }));
     window.dispatchEvent(new CustomEvent('hao:membership-changed', { detail }));
@@ -270,7 +277,7 @@
       if (error) throw error;
       await handleSession(data.session);
     } catch (error) {
-      state.error = error?.message || String(error);
+      setError(error);
     } finally {
       state.loading = false;
       render();
@@ -279,19 +286,20 @@
     return snapshot();
   }
 
-  async function signInWithGoogle() {
+  async function signInWithProvider(provider) {
+    if (!OAUTH_PROVIDERS.has(provider)) throw new Error(`Unsupported OAuth provider: ${provider}`);
     state.loading = true;
     state.error = '';
     render();
     try {
       const client = await getClient();
       const { error } = await client.auth.signInWithOAuth({
-        provider: 'google',
+        provider,
         options: { redirectTo: config.redirectUrl || window.location.href },
       });
       if (error) throw error;
     } catch (error) {
-      state.error = error?.message || String(error);
+      setError(error);
       state.loading = false;
       render();
     }
@@ -322,7 +330,7 @@
       if (error) throw error;
       state.notice = text().sent;
     } catch (error) {
-      state.error = error?.message || String(error);
+      setError(error);
     } finally {
       state.loading = false;
       render();
@@ -339,7 +347,7 @@
       await handleSession(null);
       state.open = false;
     } catch (error) {
-      state.error = error?.message || String(error);
+      setError(error);
     } finally {
       state.loading = false;
       render();
@@ -362,7 +370,7 @@
       state.profile = data;
       state.notice = text().profileSaved;
     } catch (error) {
-      state.error = error?.message || String(error);
+      setError(error);
     } finally {
       state.loading = false;
       render();
@@ -409,7 +417,7 @@
       if (error) throw error;
       state.notice = text().feedbackSent;
     } catch (error) {
-      state.error = error?.message || String(error);
+      setError(error);
     } finally {
       state.loading = false;
       render();
@@ -438,7 +446,7 @@
       if (!response.ok || !payload.url) throw new Error(payload.error || `Membership request failed (${response.status})`);
       window.location.assign(payload.url);
     } catch (error) {
-      state.error = error?.message || String(error);
+      setError(error);
       state.loading = false;
       render();
     }
@@ -563,15 +571,22 @@
       const badge = document.createElement('span');
       badge.className = 'hao-account-status-chip';
       badge.textContent = t.optional;
-      const google = document.createElement('button');
-      google.type = 'button';
-      google.className = 'hao-account-primary';
-      google.innerHTML = `${icon('google')}<span>${state.loading ? t.loading : t.google}</span>`;
-      google.disabled = state.loading;
-      google.addEventListener('click', () => void signInWithGoogle());
+      guest.appendChild(badge);
+
+      for (const provider of ['google', 'github', 'x']) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'hao-account-provider';
+        button.dataset.oauthProvider = provider;
+        button.innerHTML = `${icon(provider)}<span>${state.loading ? t.loading : t[provider]}</span>`;
+        button.disabled = state.loading;
+        button.addEventListener('click', () => void signInWithProvider(provider));
+        guest.appendChild(button);
+      }
+
       const divider = document.createElement('div');
       divider.className = 'hao-account-divider';
-      divider.textContent = 'OR';
+      divider.textContent = t.or;
       const form = document.createElement('form');
       form.className = 'hao-account-email';
       form.innerHTML = `${icon('mail')}<input type="email" autocomplete="email" required><button type="submit"></button>`;
@@ -589,7 +604,7 @@
       turnstileHost.className = 'hao-account-turnstile';
       turnstileHost.style.minHeight = '65px';
       turnstileHost.style.overflow = 'hidden';
-      guest.append(badge, google, divider, form, turnstileHost);
+      guest.append(divider, form, turnstileHost);
       dialog.appendChild(guest);
     } else {
       const account = document.createElement('div');
@@ -652,7 +667,10 @@
         const select = document.createElement('select');
         select.setAttribute('aria-label', t.category);
         [['general', t.general], ['idea', t.idea], ['bug', t.bug], ['content', t.content], ['other', t.other]].forEach(([value, labelText]) => {
-          const option = document.createElement('option'); option.value = value; option.textContent = labelText; select.appendChild(option);
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = labelText;
+          select.appendChild(option);
         });
         const textarea = document.createElement('textarea');
         textarea.maxLength = 4000;
@@ -674,18 +692,27 @@
       const actions = document.createElement('div');
       actions.className = 'hao-account-actions';
       if (config.billingEnabled && !isPro && config.checkoutFunctionUrl) {
-        const upgrade = document.createElement('button'); upgrade.type = 'button'; upgrade.textContent = t.upgrade;
-        upgrade.className = 'hao-account-primary'; upgrade.addEventListener('click', () => void callBilling(config.checkoutFunctionUrl)); actions.appendChild(upgrade);
+        const upgrade = document.createElement('button');
+        upgrade.type = 'button';
+        upgrade.textContent = t.upgrade;
+        upgrade.className = 'hao-account-primary';
+        upgrade.addEventListener('click', () => void callBilling(config.checkoutFunctionUrl));
+        actions.appendChild(upgrade);
       }
       if (config.billingEnabled && isPro && config.portalFunctionUrl) {
-        const manage = document.createElement('button'); manage.type = 'button'; manage.textContent = t.manage;
-        manage.addEventListener('click', () => void callBilling(config.portalFunctionUrl)); actions.appendChild(manage);
+        const manage = document.createElement('button');
+        manage.type = 'button';
+        manage.textContent = t.manage;
+        manage.addEventListener('click', () => void callBilling(config.portalFunctionUrl));
+        actions.appendChild(manage);
       }
       const refreshButton = document.createElement('button');
-      refreshButton.type = 'button'; refreshButton.innerHTML = `${icon('refresh')}<span>${t.refresh}</span>`;
+      refreshButton.type = 'button';
+      refreshButton.innerHTML = `${icon('refresh')}<span>${t.refresh}</span>`;
       refreshButton.addEventListener('click', () => void refresh());
       const logoutButton = document.createElement('button');
-      logoutButton.type = 'button'; logoutButton.innerHTML = `${icon('logout')}<span>${t.signOut}</span>`;
+      logoutButton.type = 'button';
+      logoutButton.innerHTML = `${icon('logout')}<span>${t.signOut}</span>`;
       logoutButton.addEventListener('click', () => void signOut());
       actions.append(refreshButton, logoutButton);
       account.appendChild(actions);
@@ -707,13 +734,22 @@
       dialog.appendChild(billingNote);
     }
     if (state.notice) {
-      const notice = document.createElement('p'); notice.className = 'hao-account-notice'; notice.textContent = state.notice; dialog.appendChild(notice);
+      const notice = document.createElement('p');
+      notice.className = 'hao-account-notice';
+      notice.textContent = state.notice;
+      dialog.appendChild(notice);
     }
     if (state.error) {
-      const error = document.createElement('p'); error.className = 'hao-account-error'; error.textContent = `${t.unavailable} ${state.error}`; dialog.appendChild(error);
+      const error = document.createElement('p');
+      error.className = 'hao-account-error';
+      error.textContent = state.error === t.captchaRequired ? state.error : t.unavailable;
+      dialog.appendChild(error);
     }
     if (state.loading) {
-      const busy = document.createElement('div'); busy.className = 'hao-account-busy'; busy.textContent = t.loading; dialog.appendChild(busy);
+      const busy = document.createElement('div');
+      busy.className = 'hao-account-busy';
+      busy.textContent = t.loading;
+      dialog.appendChild(busy);
     }
 
     backdrop.appendChild(dialog);
@@ -791,7 +827,7 @@
         window.setTimeout(() => void handleSession(session), 0);
       });
     } catch (error) {
-      state.error = error?.message || String(error);
+      setError(error);
     } finally {
       state.loading = false;
       render();
@@ -804,6 +840,7 @@
     open,
     close,
     refresh,
+    signInWithProvider,
     can: (code) => state.entitlements.has(String(code || '')),
     getClient,
     saveProductData,
