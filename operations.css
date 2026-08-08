@@ -30,7 +30,7 @@
 
 .growth-health-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(300px, .75fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, .85fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -42,7 +42,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
 }
 
 .growth-summary > div,
@@ -143,12 +143,18 @@
 
 .overview-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, .8fr);
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
 }
 
-.revenue-column { display: grid; gap: 16px; }
+.revenue-column {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
 .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
 
 .traffic-table {
@@ -191,6 +197,55 @@
   line-height: 1.55;
 }
 .overview-note[data-kind="error"] { color: var(--danger); }
+
+.metric-disclosure,
+.disclosure-panel {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(7, 9, 12, .2);
+}
+
+.metric-disclosure { margin-top: 12px; }
+
+.metric-disclosure > summary,
+.disclosure-panel > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.metric-disclosure > summary { padding: 11px 13px; }
+.disclosure-panel > summary { padding: 16px 18px; }
+.metric-disclosure > summary::-webkit-details-marker,
+.disclosure-panel > summary::-webkit-details-marker { display: none; }
+
+.disclosure-title { display: grid; gap: 3px; }
+.disclosure-title strong { font-size: 13px; }
+.disclosure-title span { color: var(--muted); font-size: 10px; }
+.disclosure-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+}
+.disclosure-panel[open] > summary .disclosure-icon,
+.metric-disclosure[open] > summary .disclosure-icon { transform: rotate(45deg); }
+
+.disclosure-panel > .table-scroll,
+.disclosure-panel > .overview-note { margin-left: 16px; margin-right: 16px; }
+.disclosure-panel > .overview-note { margin-bottom: 14px; }
+.metric-disclosure > .growth-chart-wrap { padding: 8px 12px 0; }
+.metric-disclosure > .growth-axis { margin: -8px 12px 0; }
+.metric-disclosure > .overview-note { margin: 12px 14px 14px; }
 
 .money-list { display: grid; gap: 10px; }
 .money-row {
@@ -241,8 +296,8 @@
 .payout-row span { color: var(--muted); font-size: 10px; }
 
 @media (max-width: 1050px) {
-  .growth-health-grid,
-  .overview-grid { grid-template-columns: 1fr; }
+  .growth-health-grid { grid-template-columns: 1fr; }
+  .revenue-column { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 900px) {
