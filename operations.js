@@ -25,6 +25,8 @@ const els = {
   statViews: $('#overview-stat-views'),
   statProperties: $('#overview-stat-properties'),
   statPayments: $('#overview-stat-payments'),
+  rumRows: $('#rum-rows'),
+  rumNote: $('#rum-note'),
   trafficRows: $('#traffic-rows'),
   trafficNote: $('#traffic-note'),
   revenueSummary: $('#revenue-summary'),
@@ -44,9 +46,10 @@ function formatNumber(value, maximumFractionDigits = 0) {
 }
 
 function formatPercent(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   return new Intl.NumberFormat('zh-CN', {
     style: 'percent', maximumFractionDigits: 1
-  }).format(Number(value || 0));
+  }).format(Number(value));
 }
 
 function formatDuration(seconds) {
@@ -99,13 +102,58 @@ async function callOverview(forceRefresh = false) {
   return result;
 }
 
-function renderTraffic(analytics) {
-  const aggregate = analytics?.aggregate || {};
-  const thirtyDay = aggregate.thirty_day || {};
-  els.statSessions.textContent = formatNumber(thirtyDay.sessions);
-  els.statViews.textContent = formatNumber(thirtyDay.page_views);
-  els.statProperties.textContent = `${formatNumber(aggregate.reporting_properties)}/${formatNumber(aggregate.configured_properties)}`;
+function rumHealth(product) {
+  if (product.status !== 'ok') return { label: '无数据', className: '' };
+  const rates = [product.lcp_good_rate, product.inp_good_rate, product.cls_good_rate]
+    .filter((value) => value !== null && value !== undefined)
+    .map(Number);
+  if (!rates.length) return { label: '采样中', className: '' };
+  if (rates.every((value) => value >= 0.75)) return { label: '良好', className: 'active' };
+  if (rates.some((value) => value < 0.5)) return { label: '需关注', className: 'failed' };
+  return { label: '观察', className: '' };
+}
 
+function renderRum(cloudflare) {
+  const aggregate = cloudflare?.aggregate || {};
+  els.statSessions.textContent = cloudflare?.status === 'ok' ? formatNumber(aggregate.visits) : '—';
+  els.statViews.textContent = cloudflare?.status === 'ok' ? formatNumber(aggregate.page_views) : '—';
+  els.statProperties.textContent = `${formatNumber(aggregate.reporting_products)}/${formatNumber(aggregate.configured_products)}`;
+
+  const products = cloudflare?.products || [];
+  els.rumRows.innerHTML = products.length
+    ? products.map((product) => {
+      const health = rumHealth(product);
+      return `
+        <tr class="${product.status === 'ok' ? '' : 'is-error'}">
+          <td>
+            <strong>${escapeHtml(product.name)}</strong>
+            <span>${escapeHtml(product.host)}${escapeHtml(product.path_prefix)}</span>
+          </td>
+          <td>${formatNumber(product.page_views)}</td>
+          <td>${formatNumber(product.visits)}</td>
+          <td>${formatPercent(product.lcp_good_rate)}</td>
+          <td>${formatPercent(product.inp_good_rate)}</td>
+          <td>${formatPercent(product.cls_good_rate)}</td>
+          <td><span class="badge ${health.className}">${health.label}</span></td>
+        </tr>`;
+    }).join('')
+    : '<tr><td colspan="7" class="empty-copy">尚无 Cloudflare RUM 数据。</td></tr>';
+
+  if (cloudflare?.status === 'not_configured') {
+    els.rumNote.textContent = 'Cloudflare GraphQL 尚未配置：需要在 Supabase Edge Function Secrets 中配置 Cloudflare Account ID 与只读 Analytics API Token。';
+    els.rumNote.dataset.kind = 'error';
+    return;
+  }
+  if (cloudflare?.status === 'error') {
+    els.rumNote.textContent = `Cloudflare 查询失败：${cloudflare.error || '未知错误'}`;
+    els.rumNote.dataset.kind = 'error';
+    return;
+  }
+  els.rumNote.textContent = 'Cloudflare 是七个产品的统一流量与真实用户体验口径；LCP / INP / CLS 显示 30 日 Good 事件占比，CCUS Policy Hub 只进入可观测层，不进入会员或 Stripe。';
+  els.rumNote.dataset.kind = '';
+}
+
+function renderTraffic(analytics) {
   const properties = analytics?.properties || [];
   els.trafficRows.innerHTML = properties.length
     ? properties.map((property) => {
@@ -126,12 +174,12 @@ function renderTraffic(analytics) {
           <td><span class="badge ${property.status === 'ok' ? 'active' : 'failed'}">${property.status === 'ok' ? '正常' : '失败'}</span></td>
         </tr>`;
     }).join('')
-    : '<tr><td colspan="8" class="empty-copy">尚无 GA4 数据。</td></tr>';
+    : '<tr><td colspan="8" class="empty-copy">尚无 GA4 行为分析数据。</td></tr>';
 
   const failed = properties.filter((property) => property.status !== 'ok');
   els.trafficNote.textContent = failed.length
-    ? `${failed.length} 个 Property 查询失败：${failed.map((item) => `${item.name} · ${item.error}`).join('；')}`
-    : '活跃用户为各 Property 独立口径，跨产品相加可能包含同一访客。GA4 当日数据可能存在处理延迟。';
+    ? `${failed.length} 个 GA4 Property 查询失败：${failed.map((item) => `${item.name} · ${item.error}`).join('；')}`
+    : 'GA4 仅保留在需要行为、漏斗或来源分析的 FlappyK、NewsFlow 与 Notes；不再作为全产品统一流量口径。';
   els.trafficNote.dataset.kind = failed.length ? 'error' : '';
 }
 
@@ -179,6 +227,7 @@ function renderRevenue(stripe) {
 }
 
 function renderOverview(data) {
+  renderRum(data.cloudflare);
   renderTraffic(data.analytics);
   renderRevenue(data.stripe);
   const generated = formatDate(data.generated_at);
@@ -189,7 +238,7 @@ function renderOverview(data) {
 async function refreshOverview(forceRefresh = false) {
   if (loading) return;
   setLoading(true);
-  setStatus(forceRefresh ? '正在强制刷新 GA4 与 Stripe…' : '正在载入 GA4 与 Stripe 经营数据…');
+  setStatus(forceRefresh ? '正在强制刷新 Cloudflare、GA4 与 Stripe…' : '正在载入 Cloudflare、GA4 与 Stripe 经营数据…');
   try {
     renderOverview(await callOverview(forceRefresh));
   } catch (error) {

@@ -9,6 +9,7 @@ const ALLOWED_ORIGINS = new Set([
 const ANALYTICS_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const ANALYTICS_ENDPOINT = "https://analyticsdata.googleapis.com/v1beta";
+const CLOUDFLARE_GRAPHQL_ENDPOINT = "https://api.cloudflare.com/client/v4/graphql";
 
 const PRODUCT_NAMES: Record<string, string> = {
   alpha_engine: "AlphaEngine",
@@ -17,11 +18,53 @@ const PRODUCT_NAMES: Record<string, string> = {
   notes: "Notes",
   ownly: "Ownly",
   rhythmcoach: "RhythmCoach",
+  ccus_policy_hub: "CCUS Policy Hub",
 };
+
+const GA4_BEHAVIOR_PRODUCTS = new Set(["flappyk", "newsflow", "notes"]);
+
+const RUM_PRODUCTS = [
+  { product_code: "alpha_engine", name: "AlphaEngine", host: "liuh886.github.io", path_prefix: "/alpha_engine/" },
+  { product_code: "flappyk", name: "FlappyK", host: "liuh886.github.io", path_prefix: "/FlappyK/" },
+  { product_code: "newsflow", name: "NewsFlow", host: "liuh886.github.io", path_prefix: "/NewsFlow/" },
+  { product_code: "ownly", name: "Ownly", host: "liuh886.github.io", path_prefix: "/ownly/" },
+  { product_code: "rhythmcoach", name: "RhythmCoach", host: "liuh886.github.io", path_prefix: "/RhythmCoach/" },
+  { product_code: "ccus_policy_hub", name: "CCUS Policy Hub", host: "liuh886.github.io", path_prefix: "/ccus-policy-hub/" },
+  { product_code: "notes", name: "Notes", host: "zhihaol.eu.org", path_prefix: "/" },
+] as const;
 
 interface CachedOverview {
   expiresAt: number;
   payload: Record<string, unknown>;
+}
+
+interface AnalyticsWindow {
+  active_users: number;
+  new_users: number;
+  sessions: number;
+  page_views: number;
+  engagement_rate: number;
+  average_session_duration_seconds: number;
+}
+
+interface RumProductSummary {
+  product_code: string;
+  name: string;
+  host: string;
+  path_prefix: string;
+  status: "ok" | "no_data";
+  page_views: number;
+  visits: number;
+  web_vitals_samples: number;
+  lcp_good: number;
+  lcp_total: number;
+  inp_good: number;
+  inp_total: number;
+  cls_good: number;
+  cls_total: number;
+  lcp_good_rate: number | null;
+  inp_good_rate: number | null;
+  cls_good_rate: number | null;
 }
 
 let cachedOverview: CachedOverview | null = null;
@@ -142,15 +185,6 @@ const GA_METRICS = [
   "averageSessionDuration",
 ] as const;
 
-interface AnalyticsWindow {
-  active_users: number;
-  new_users: number;
-  sessions: number;
-  page_views: number;
-  engagement_rate: number;
-  average_session_duration_seconds: number;
-}
-
 function emptyAnalyticsWindow(): AnalyticsWindow {
   return {
     active_users: 0,
@@ -204,13 +238,13 @@ function analyticsProperties(): Array<{ product_code: string; name: string; prop
   if (!raw) throw new Error("GA4_PROPERTY_IDS is not configured.");
   const parsed = JSON.parse(raw) as Record<string, string>;
   const rows = Object.entries(parsed)
-    .filter(([, propertyId]) => /^\d+$/.test(String(propertyId)))
+    .filter(([productCode, propertyId]) => GA4_BEHAVIOR_PRODUCTS.has(productCode) && /^\d+$/.test(String(propertyId)))
     .map(([productCode, propertyId]) => ({
       product_code: productCode,
       name: PRODUCT_NAMES[productCode] ?? productCode,
       property_id: String(propertyId),
     }));
-  if (!rows.length) throw new Error("GA4_PROPERTY_IDS contains no valid properties.");
+  if (!rows.length) throw new Error("GA4_PROPERTY_IDS contains no behavior-analytics properties.");
   return rows;
 }
 
@@ -236,26 +270,195 @@ async function analyticsOverview(): Promise<Record<string, unknown>> {
   }));
 
   const successful = reports.filter((report) => report.status === "ok");
-  const sum = (windowName: "seven_day" | "thirty_day", field: keyof AnalyticsWindow) =>
-    successful.reduce((total, report) => total + Number(report[windowName][field] ?? 0), 0);
-
   return {
     properties: reports,
     aggregate: {
       reporting_properties: successful.length,
       configured_properties: reports.length,
-      seven_day: {
-        active_users_property_sum: sum("seven_day", "active_users"),
-        sessions: sum("seven_day", "sessions"),
-        page_views: sum("seven_day", "page_views"),
-      },
-      thirty_day: {
-        active_users_property_sum: sum("thirty_day", "active_users"),
-        sessions: sum("thirty_day", "sessions"),
-        page_views: sum("thirty_day", "page_views"),
-      },
     },
   };
+}
+
+function normalizeHost(value: unknown): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function normalizePath(value: unknown): string {
+  const raw = String(value ?? "/").trim();
+  return (raw.startsWith("/") ? raw : `/${raw}`).toLowerCase();
+}
+
+function rumProduct(host: unknown, path: unknown): typeof RUM_PRODUCTS[number] | null {
+  const normalizedHost = normalizeHost(host);
+  const normalizedPath = normalizePath(path);
+  for (const product of RUM_PRODUCTS) {
+    if (normalizedHost !== product.host.toLowerCase()) continue;
+    if (product.path_prefix === "/") return product;
+    const prefix = product.path_prefix.toLowerCase().replace(/\/+$/g, "");
+    if (normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)) return product;
+  }
+  return null;
+}
+
+function ratio(good: number, total: number): number | null {
+  return total > 0 ? good / total : null;
+}
+
+function emptyRumSummary(product: typeof RUM_PRODUCTS[number]): RumProductSummary {
+  return {
+    ...product,
+    status: "no_data",
+    page_views: 0,
+    visits: 0,
+    web_vitals_samples: 0,
+    lcp_good: 0,
+    lcp_total: 0,
+    inp_good: 0,
+    inp_total: 0,
+    cls_good: 0,
+    cls_total: 0,
+    lcp_good_rate: null,
+    inp_good_rate: null,
+    cls_good_rate: null,
+  };
+}
+
+async function cloudflareGraphql(query: string, variables: Record<string, unknown>): Promise<Record<string, any>> {
+  const apiToken = Deno.env.get("CLOUDFLARE_ANALYTICS_API_TOKEN") ?? "";
+  if (!apiToken) throw new Error("CLOUDFLARE_ANALYTICS_API_TOKEN is not configured.");
+  const response = await fetch(CLOUDFLARE_GRAPHQL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const payload = await response.json() as Record<string, any>;
+  if (!response.ok) throw new Error(`Cloudflare GraphQL failed (${response.status}).`);
+  if (Array.isArray(payload.errors) && payload.errors.length) {
+    throw new Error(payload.errors.map((item: Record<string, unknown>) => String(item.message ?? "Cloudflare GraphQL error")).join("; "));
+  }
+  return payload;
+}
+
+async function cloudflareOverview(): Promise<Record<string, unknown>> {
+  const accountTag = (Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? "").trim();
+  const apiToken = (Deno.env.get("CLOUDFLARE_ANALYTICS_API_TOKEN") ?? "").trim();
+  if (!accountTag || !apiToken) {
+    return {
+      status: "not_configured",
+      error: "Cloudflare Analytics credentials are not configured.",
+      products: RUM_PRODUCTS.map(emptyRumSummary),
+      aggregate: {
+        reporting_products: 0,
+        configured_products: RUM_PRODUCTS.length,
+        page_views: 0,
+        visits: 0,
+      },
+    };
+  }
+
+  const end = new Date();
+  const start = new Date(end.getTime() - 30 * 86_400_000);
+  const query = `
+    query OperationsRum($accountTag: string!, $start: Time!, $end: Time!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          pageload: rumPageloadEventsAdaptiveGroups(
+            limit: 10000
+            orderBy: [count_DESC]
+            filter: { datetime_geq: $start, datetime_leq: $end, bot: 0 }
+          ) {
+            count
+            sum { visits }
+            dimensions { requestHost requestPath siteTag }
+          }
+          vitals: rumWebVitalsEventsAdaptiveGroups(
+            limit: 10000
+            orderBy: [count_DESC]
+            filter: { datetime_geq: $start, datetime_leq: $end, bot: 0 }
+          ) {
+            count
+            sum {
+              lcpGood lcpNeedsImprovement lcpPoor lcpTotal
+              inpGood inpNeedsImprovement inpPoor inpTotal
+              clsGood clsNeedsImprovement clsPoor clsTotal
+            }
+            dimensions { requestHost requestPath siteTag }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const payload = await cloudflareGraphql(query, {
+      accountTag,
+      start: start.toISOString(),
+      end: end.toISOString(),
+    });
+    const account = payload.data?.viewer?.accounts?.[0];
+    if (!account) throw new Error("Cloudflare account analytics are unavailable.");
+
+    const summaries = new Map<string, RumProductSummary>(
+      RUM_PRODUCTS.map((product) => [product.product_code, emptyRumSummary(product)]),
+    );
+
+    for (const row of account.pageload ?? []) {
+      const product = rumProduct(row.dimensions?.requestHost, row.dimensions?.requestPath);
+      if (!product) continue;
+      const summary = summaries.get(product.product_code)!;
+      summary.page_views += Number(row.count ?? 0) || 0;
+      summary.visits += Number(row.sum?.visits ?? 0) || 0;
+    }
+
+    for (const row of account.vitals ?? []) {
+      const product = rumProduct(row.dimensions?.requestHost, row.dimensions?.requestPath);
+      if (!product) continue;
+      const summary = summaries.get(product.product_code)!;
+      const sum = row.sum ?? {};
+      summary.web_vitals_samples += Number(row.count ?? 0) || 0;
+      summary.lcp_good += Number(sum.lcpGood ?? 0) || 0;
+      summary.lcp_total += Number(sum.lcpTotal ?? 0) || 0;
+      summary.inp_good += Number(sum.inpGood ?? 0) || 0;
+      summary.inp_total += Number(sum.inpTotal ?? 0) || 0;
+      summary.cls_good += Number(sum.clsGood ?? 0) || 0;
+      summary.cls_total += Number(sum.clsTotal ?? 0) || 0;
+    }
+
+    const products = [...summaries.values()].map((summary) => {
+      summary.status = summary.page_views > 0 || summary.web_vitals_samples > 0 ? "ok" : "no_data";
+      summary.lcp_good_rate = ratio(summary.lcp_good, summary.lcp_total);
+      summary.inp_good_rate = ratio(summary.inp_good, summary.inp_total);
+      summary.cls_good_rate = ratio(summary.cls_good, summary.cls_total);
+      return summary;
+    });
+
+    return {
+      status: "ok",
+      window_days: 30,
+      products,
+      aggregate: {
+        reporting_products: products.filter((product) => product.status === "ok").length,
+        configured_products: products.length,
+        page_views: products.reduce((total, product) => total + product.page_views, 0),
+        visits: products.reduce((total, product) => total + product.visits, 0),
+      },
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      error: error instanceof Error ? error.message : String(error),
+      products: RUM_PRODUCTS.map(emptyRumSummary),
+      aggregate: {
+        reporting_products: 0,
+        configured_products: RUM_PRODUCTS.length,
+        page_views: 0,
+        visits: 0,
+      },
+    };
+  }
 }
 
 async function stripeRequest(path: string): Promise<Record<string, any>> {
@@ -405,21 +608,23 @@ Deno.serve(async (req: Request) => {
     body = {};
   }
   const forceRefresh = body.force_refresh === true && adminRow.role === "owner";
-  const cacheMinutes = Math.min(1440, Math.max(5, Number(Deno.env.get("GA4_CACHE_MINUTES") ?? 30) || 30));
+  const cacheMinutes = Math.min(1440, Math.max(5, Number(Deno.env.get("OPERATIONS_CACHE_MINUTES") ?? 30) || 30));
 
   if (!forceRefresh && cachedOverview && cachedOverview.expiresAt > Date.now()) {
     return json(req, { ...cachedOverview.payload, cached: true });
   }
 
   try {
-    const [analytics, stripe] = await Promise.all([
+    const [analytics, cloudflare, stripe] = await Promise.all([
       analyticsOverview(),
+      cloudflareOverview(),
       stripeOverview(admin),
     ]);
     const payload = {
       generated_at: new Date().toISOString(),
       cache_minutes: cacheMinutes,
       cached: false,
+      cloudflare,
       analytics,
       stripe,
     };
