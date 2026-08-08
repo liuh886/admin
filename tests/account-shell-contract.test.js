@@ -41,6 +41,18 @@ expect(css.includes('@media (max-width: 640px)'), 'Account shell must include mo
 expect(css.includes('prefers-reduced-motion'), 'Account shell must respect reduced motion');
 
 for (const required of [
+  "const TURNSTILE_SITE_KEY = '0x4AAAAAAEKVMnWa2valozxW'",
+  'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit',
+  'function loadTurnstile()',
+  'async function mountTurnstile',
+  'captchaToken: verifiedToken',
+  'magicLinkButton.disabled = true',
+]) {
+  expect(script.includes(required), `Shared account shell is missing Turnstile contract: ${required}`);
+}
+expect(!/TURNSTILE_SECRET|secretKey|secret_key/i.test(script), 'Turnstile secret material must never enter the browser shell');
+
+for (const required of [
   'create table if not exists public.product_accounts',
   'create table if not exists public.product_feedback',
   'alter table public.product_accounts enable row level security',
@@ -62,4 +74,4 @@ for (const forbidden of [
   expect(!forbidden.test(browser), `Shared browser assets contain forbidden secret material: ${forbidden}`);
 }
 
-console.log('Shared account shell requires explicit embedded mounts and exposes no floating fallback or privileged secret.');
+console.log('Shared account shell requires embedded mounts, Turnstile-protected email auth, and exposes no privileged secret.');
