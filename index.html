@@ -16,8 +16,8 @@
     <section id="auth-gate" class="auth-gate" aria-labelledby="auth-title">
       <div class="brand-mark" aria-hidden="true">H</div>
       <p class="eyebrow">HAO APPS · PRIVATE OPERATIONS</p>
-      <h1 id="auth-title">会员运营台</h1>
-      <p class="auth-copy">使用共享 Supabase 账户登录。只有管理员白名单中的账号可以读取经营数据、管理会员与执行退款。</p>
+      <h1 id="auth-title">运营控制台</h1>
+      <p class="auth-copy">使用共享 Supabase 账户登录。只有管理员白名单中的账号可以读取经营与产品健康数据、管理会员并执行退款。</p>
       <button id="google-login" class="button primary" type="button">使用 Google 登录</button>
       <p id="auth-status" class="status-line" role="status" aria-live="polite"></p>
     </section>
@@ -43,8 +43,8 @@
       <section class="hero-row">
         <div>
           <p class="eyebrow">LIVE OPERATIONS CONTROL</p>
-          <h2>访问、收入、会员与退款，集中在一个可信入口。</h2>
-          <p>GA4 与 Stripe 只通过受保护的 Supabase Edge Function 读取；所有会员写操作继续记录到只追加的审计台账。</p>
+          <h2>访问、体验、收入与会员，集中在一个可信入口。</h2>
+          <p>Cloudflare RUM 是全产品观测底座；GA4 只承担需要行为分析的产品；Stripe 与会员写操作继续通过受保护的 Supabase Edge Function。</p>
         </div>
         <span class="live-pill"><i></i> Live mode</span>
       </section>
@@ -59,26 +59,52 @@
       <section id="business-overview" class="business-overview" aria-labelledby="business-overview-title">
         <div class="section-heading overview-heading">
           <div>
-            <p class="eyebrow">TRAFFIC & REVENUE</p>
+            <p class="eyebrow">OBSERVABILITY & REVENUE</p>
             <h2 id="business-overview-title">经营总览</h2>
-            <p>六个 GA4 Property 与 Stripe Live Mode 的只读汇总。</p>
+            <p>七个产品的 Cloudflare RUM、三项 GA4 行为分析与 Stripe Live Mode 只读汇总。</p>
           </div>
           <button id="overview-refresh" class="button ghost compact" type="button">刷新数据</button>
         </div>
         <p id="overview-status" class="status-line" role="status" aria-live="polite"></p>
 
         <section class="overview-kpis" aria-label="经营关键指标">
-          <article><span>30 日会话</span><strong id="overview-stat-sessions">—</strong></article>
+          <article><span>30 日访问</span><strong id="overview-stat-sessions">—</strong></article>
           <article><span>30 日页面浏览</span><strong id="overview-stat-views">—</strong></article>
-          <article><span>正常上报 Property</span><strong id="overview-stat-properties">—</strong></article>
+          <article><span>正常上报产品</span><strong id="overview-stat-properties">—</strong></article>
           <article><span>30 日成功付款</span><strong id="overview-stat-payments">—</strong></article>
         </section>
+
+        <article class="panel traffic-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">CLOUDFLARE WEB ANALYTICS</p><h3>产品流量与真实用户体验</h3></div>
+            <span class="subtle">30 日 · RUM</span>
+          </div>
+          <div class="table-scroll">
+            <table class="traffic-table">
+              <thead>
+                <tr>
+                  <th>产品</th>
+                  <th>页面浏览</th>
+                  <th>访问</th>
+                  <th>LCP Good</th>
+                  <th>INP Good</th>
+                  <th>CLS Good</th>
+                  <th>健康度</th>
+                </tr>
+              </thead>
+              <tbody id="rum-rows">
+                <tr><td colspan="7" class="empty-copy">正在载入 Cloudflare RUM 数据…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="rum-note" class="overview-note"></p>
+        </article>
 
         <div class="overview-grid">
           <article class="panel traffic-panel">
             <div class="panel-heading">
-              <div><p class="eyebrow">GOOGLE ANALYTICS 4</p><h3>产品访问</h3></div>
-              <span class="subtle">7 日 / 30 日</span>
+              <div><p class="eyebrow">PRODUCT BEHAVIOR · GA4</p><h3>行为分析补充</h3></div>
+              <span class="subtle">FlappyK · NewsFlow · Notes</span>
             </div>
             <div class="table-scroll">
               <table class="traffic-table">
@@ -95,7 +121,7 @@
                   </tr>
                 </thead>
                 <tbody id="traffic-rows">
-                  <tr><td colspan="8" class="empty-copy">正在载入 GA4 数据…</td></tr>
+                  <tr><td colspan="8" class="empty-copy">正在载入 GA4 行为数据…</td></tr>
                 </tbody>
               </table>
             </div>
