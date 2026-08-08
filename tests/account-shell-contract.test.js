@@ -10,16 +10,16 @@ function expect(condition, message) {
 }
 
 for (const required of [
-  "signInWithOAuth",
-  "signInWithOtp",
+  'signInWithOAuth',
+  'signInWithOtp',
   "from('profiles')",
   "from('product_accounts')",
   "from('product_feedback')",
   "from('entitlements')",
-  "hao:account-changed",
-  "hao:membership-changed",
-  "saveProductData",
-  "submitFeedback",
+  'hao:account-changed',
+  'hao:membership-changed',
+  'saveProductData',
+  'submitFeedback',
   'function findMount()',
   'function attachTrigger()',
   'function observeMount()',
@@ -29,11 +29,21 @@ for (const required of [
   expect(script.includes(required), `Shared account shell is missing ${required}`);
 }
 
-expect(script.includes("provider: 'google'"), 'Google must remain the primary OAuth provider');
+for (const required of [
+  "const OAUTH_PROVIDERS = new Set(['google', 'github', 'x'])",
+  'async function signInWithProvider(provider)',
+  "for (const provider of ['google', 'github', 'x'])",
+  "github: 'Continue with GitHub'",
+  "x: 'Continue with X'",
+  'button.dataset.oauthProvider = provider',
+]) {
+  expect(script.includes(required), `Shared account shell is missing multi-provider OAuth contract: ${required}`);
+}
+expect(!script.includes('signInWithGoogle'), 'Provider-specific Google auth helper must be removed in favor of the shared provider path');
 expect(script.includes("flowType: 'pkce'"), 'Browser auth must use PKCE');
 expect(script.includes('persistSession: true'), 'Account sessions must persist across Hao Apps on the shared origin');
-expect(script.includes("config.billingEnabled"), 'Paid actions must remain controlled by the product config');
-expect(script.includes("config.feedbackEnabled"), 'Feedback must remain opt-in per product');
+expect(script.includes('config.billingEnabled'), 'Paid actions must remain controlled by the product config');
+expect(script.includes('config.feedbackEnabled'), 'Feedback must remain opt-in per product');
 expect(!script.includes("triggerHost.classList.add('is-floating')"), 'Shared account controls must never create a floating fallback');
 expect(!css.includes('.hao-account-mount.is-floating'), 'Shared styles must not own a floating account launcher');
 expect(css.includes('.hao-account-dialog'), 'Shared account drawer styling must exist');
@@ -74,4 +84,4 @@ for (const forbidden of [
   expect(!forbidden.test(browser), `Shared browser assets contain forbidden secret material: ${forbidden}`);
 }
 
-console.log('Shared account shell requires embedded mounts, Turnstile-protected email auth, and exposes no privileged secret.');
+console.log('Shared account shell uses Google, GitHub and X OAuth, embedded mounts, Turnstile-protected email auth, and no privileged secret.');
