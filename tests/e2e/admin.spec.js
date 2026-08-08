@@ -23,7 +23,7 @@ test('private console starts at the administrator login gate', async ({ page }) 
   await page.goto('/');
   await expect(page).toHaveTitle('Hao Apps · Private Operations');
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex,nofollow,noarchive');
-  await expect(page.getByRole('heading', { name: '会员运营台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '运营控制台' })).toBeVisible();
   await expect(page.locator('#console')).toBeHidden();
   await expect(page.locator('#business-overview')).toBeHidden();
 
