@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.111.0";
 
 const ALLOWED_ORIGINS = new Set([
   "https://liuh886.github.io",
@@ -110,6 +110,12 @@ Deno.serve(async (req: Request) => {
   }
 
   const action = String(body.action ?? "list");
+  const requireAal2 = async () => {
+    const { data, error } = await userClient.auth.mfa.getAuthenticatorAssuranceLevel(token);
+    if (error || data.currentLevel !== "aal2") {
+      throw new Error("AAL2 multi-factor authentication is required for this administrative action.");
+    }
+  };
   const requireOperator = () => {
     if (!["owner", "operator"].includes(String(adminRow.role))) {
       throw new Error("This action requires operator access.");
@@ -191,6 +197,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "update") {
+      await requireAal2();
       requireOperator();
       const feedbackId = String(body.feedback_id ?? "").trim();
       if (!UUID.test(feedbackId)) throw new Error("A valid feedback ID is required.");
