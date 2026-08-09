@@ -22,6 +22,9 @@
       signInSection: '登录或创建账户',
       stripe: 'Stripe 安全结账 · 可随时取消',
       checkout: '开通 {app} Pro',
+      manage: '管理订阅',
+      portalOpening: '正在前往 Stripe…',
+      portalUnavailable: '暂时无法打开订阅管理。Pro 权益不受影响。',
       trialActive: 'PRO · 免费体验中',
       trialBody: '免费体验有效至 {date}。这是一个可管理的 Stripe 订阅，你可以随时查看订阅、管理付款方式或取消。',
     },
@@ -38,6 +41,9 @@
       signInSection: 'Sign in or create an account',
       stripe: 'Secure checkout with Stripe · Cancel anytime',
       checkout: 'Upgrade to {app} Pro',
+      manage: 'Manage subscription',
+      portalOpening: 'Opening Stripe…',
+      portalUnavailable: 'Subscription management is temporarily unavailable. Your Pro access is unaffected.',
       trialActive: 'PRO · FREE TRIAL',
       trialBody: 'Your free trial runs through {date}. This is a manageable Stripe subscription: you can review it, manage payment details, or cancel at any time.',
     },
@@ -98,6 +104,10 @@
     copy.append(element('strong', '', localized(title)), featureList(features));
     row.appendChild(copy);
     return row;
+  }
+
+  function removeInternalCapabilities(dialog) {
+    dialog.querySelector('.hao-account-feature-panel')?.remove();
   }
 
   function buildPlanPanel(dialog) {
@@ -182,13 +192,61 @@
     if (body) body.textContent = t.trialBody.replace('{date}', formatDate(snapshot.subscription.current_period_end));
   }
 
+  async function openPortal(button) {
+    const t = text();
+    const previous = button.textContent;
+    button.disabled = true;
+    button.textContent = t.portalOpening;
+    try {
+      const client = await window.HaoAccount?.getClient?.();
+      const { data, error } = await client.auth.getSession();
+      if (error || !data.session?.access_token) throw error || new Error('Authentication session is unavailable.');
+      const response = await fetch(config.portalFunctionUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${data.session.access_token}`,
+          apikey: config.supabasePublishableKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ product_code: config.productCode }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.url) throw new Error(payload.error || `Portal request failed (${response.status})`);
+      window.location.assign(payload.url);
+    } catch (error) {
+      console.warn('Hao Account portal:', error);
+      const card = button.closest('.hao-account-pro-card');
+      let notice = card?.querySelector('.hao-upgrade-portal-error');
+      if (!notice && card) {
+        notice = element('small', 'hao-upgrade-portal-error');
+        card.appendChild(notice);
+      }
+      if (notice) notice.textContent = t.portalUnavailable;
+      button.disabled = false;
+      button.textContent = previous;
+    }
+  }
+
+  function ensureProManagement(dialog, snapshot) {
+    if (!snapshot?.isPro) return;
+    const card = dialog.querySelector('.hao-account-pro-card.is-active');
+    const action = card?.querySelector('.hao-account-pro-action');
+    if (!card || !action || action.querySelector('button')) return;
+    const button = element('button', 'hao-upgrade-manage-subscription', text().manage);
+    button.type = 'button';
+    button.addEventListener('click', () => void openPortal(button));
+    action.appendChild(button);
+  }
+
   function enhance(snapshot = latestSnapshot) {
     const dialog = document.querySelector('#hao-account-overlay .hao-account-dialog');
     if (!dialog) return;
+    removeInternalCapabilities(dialog);
     buildPlanPanel(dialog);
     buildGuestGuide(dialog);
     enhanceSignedInCard(dialog);
     enhanceTrialCard(dialog, snapshot);
+    ensureProManagement(dialog, snapshot);
   }
 
   function resumeIntent(snapshot) {
