@@ -53,9 +53,12 @@ async function callInvite(action, payload = {}) {
 }
 
 function readInviteToken() {
-  const queryToken = new URLSearchParams(window.location.search).get('invite')?.trim().toLowerCase() || '';
-  if (queryToken) localStorage.setItem(STORAGE_KEY, queryToken);
-  return queryToken || localStorage.getItem(STORAGE_KEY) || '';
+  const fragmentToken = new URLSearchParams(window.location.hash.slice(1)).get('invite')?.trim().toLowerCase() || '';
+  if (fragmentToken) {
+    localStorage.setItem(STORAGE_KEY, fragmentToken);
+    window.history.replaceState({}, '', ADMIN_URL);
+  }
+  return fragmentToken || localStorage.getItem(STORAGE_KEY) || '';
 }
 
 const inviteToken = readInviteToken();
