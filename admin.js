@@ -89,7 +89,7 @@ function ensureMfaPanel() {
       <p id="admin-mfa-copy">管理操作需要验证器提供的一次性验证码。</p>
     </div>
     <div id="admin-mfa-enrollment" hidden>
-      <img id="admin-mfa-qr" alt="扫描二维码绑定验证器">
+      <img id="admin-mfa-qr" alt="扫描二维码绑定验证器" style="width:min(196px,100%);height:auto;border-radius:12px;background:white;padding:8px">
       <p class="status-line">使用 Google Authenticator、1Password、Microsoft Authenticator 等扫描二维码。</p>
     </div>
     <form id="admin-mfa-form">
@@ -129,6 +129,10 @@ function resetMfaGate() {
   if (qr) qr.removeAttribute('src');
   const enrollment = $('#admin-mfa-enrollment');
   if (enrollment) enrollment.hidden = true;
+  const form = $('#admin-mfa-form');
+  if (form) form.hidden = false;
+  const setup = $('#admin-mfa-setup');
+  if (setup) setup.hidden = false;
   const code = $('#admin-mfa-code');
   if (code) code.value = '';
 }
@@ -142,7 +146,7 @@ async function startMfaEnrollment() {
   }
   for (const factor of factors.all || []) {
     if (factor.factor_type === 'totp' && factor.status === 'unverified') {
-      await client.auth.mfa.unenroll({ factorId: factor.id }).catch(() => {});
+      try { await client.auth.mfa.unenroll({ factorId: factor.id }); } catch { /* stale enrollment */ }
     }
   }
   const { data, error } = await client.auth.mfa.enroll({
@@ -160,6 +164,7 @@ async function startMfaEnrollment() {
   $('#admin-mfa-copy').textContent = '扫描二维码后输入验证器生成的 6 位验证码。绑定成功后本次会话升级为 AAL2。';
   $('#admin-mfa-enrollment').hidden = false;
   $('#admin-mfa-qr').src = data.totp.qr_code;
+  $('#admin-mfa-form').hidden = false;
   $('#admin-mfa-setup').hidden = true;
   $('#admin-mfa-code').focus();
   setStatus(els.authStatus, '二维码已生成。完成绑定后才能进入运营控制台。');
@@ -210,6 +215,7 @@ async function requireAal2Gate() {
     $('#admin-mfa-title').textContent = '管理员二次验证';
     $('#admin-mfa-copy').textContent = '输入验证器生成的 6 位验证码后进入运营控制台。';
     $('#admin-mfa-enrollment').hidden = true;
+    $('#admin-mfa-form').hidden = false;
     $('#admin-mfa-setup').hidden = true;
     $('#admin-mfa-code').focus();
     setStatus(els.authStatus, '此管理员账户已启用 MFA，需要完成二次验证。');
@@ -224,17 +230,6 @@ async function requireAal2Gate() {
     setStatus(els.authStatus, '管理员控制台要求 AAL2。请先绑定验证器。');
   }
   return false;
-}
-
-async function secureBootstrap() {
-  try {
-    const ready = await requireAal2Gate();
-    if (!ready) return;
-    $('#admin-mfa-form').hidden = false;
-    await bootstrap();
-  } catch (error) {
-    showGate(error.message || '管理员二次验证不可用。', 'error');
-  }
 }
 
 async function callAdmin(action, payload = {}) {
@@ -252,6 +247,22 @@ async function callAdmin(action, payload = {}) {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || `管理请求失败（${response.status}）`);
   return result;
+}
+
+async function secureBootstrap() {
+  try {
+    showGate('正在验证管理员权限…');
+    const bootstrapData = await callAdmin('bootstrap');
+    const ready = await requireAal2Gate();
+    if (!ready) return;
+    state.bootstrap = bootstrapData;
+    renderBootstrap();
+    showConsole();
+    setStatus(els.consoleStatus, '运营台已连接 Live Mode · AAL2。', 'success');
+  } catch (error) {
+    resetMfaGate();
+    showGate(error.message || '管理员身份验证失败。', 'error');
+  }
 }
 
 function showGate(message = '', kind = '') {
@@ -425,19 +436,6 @@ async function refreshMember() {
 async function refreshBootstrap() {
   state.bootstrap = await callAdmin('bootstrap');
   renderBootstrap();
-}
-
-async function bootstrap() {
-  setBusy(true, '正在载入会员运营台…');
-  try {
-    await refreshBootstrap();
-    showConsole();
-    setStatus(els.consoleStatus, '运营台已连接 Live Mode · AAL2。', 'success');
-  } catch (error) {
-    showGate(error.message, 'error');
-  } finally {
-    setBusy(false);
-  }
 }
 
 els.googleLogin.addEventListener('click', async () => {
