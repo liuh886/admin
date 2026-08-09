@@ -202,7 +202,7 @@
 }
 
 .invite-card {
-  width: min(620px, 100%);
+  width: min(680px, 100%);
   padding: 42px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
@@ -219,18 +219,54 @@
 }
 
 .invite-lead {
-  max-width: 52ch;
-  margin: 0 0 26px;
+  max-width: 56ch;
+  margin: 0 0 22px;
   color: var(--soft);
   line-height: 1.72;
 }
 
+.invite-offer {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 22px;
+  padding: 14px;
+  border: 1px solid rgba(214, 255, 89, .18);
+  border-radius: var(--radius-sm);
+  background: rgba(214, 255, 89, .035);
+}
+
+.invite-offer-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.invite-offer-heading div > span,
+.invite-offer-heading div > strong,
+.invite-offer-heading > span {
+  display: block;
+}
+
+.invite-offer-heading div > span,
+.invite-offer-heading > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.invite-offer-heading div > strong {
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.invite-offer-list,
 .invite-access-list {
   display: grid;
   gap: 8px;
-  margin: 0 0 20px;
 }
 
+.invite-offer-item,
 .invite-access-item {
   display: flex;
   align-items: center;
@@ -244,23 +280,98 @@
   text-decoration: none;
 }
 
+.invite-offer-item:hover,
 .invite-access-item:hover {
   border-color: rgba(214, 255, 89, .28);
   background: rgba(214, 255, 89, .04);
 }
 
+.invite-offer-item strong,
+.invite-offer-item small,
 .invite-access-item strong,
 .invite-access-item small {
   display: block;
 }
 
+.invite-offer-item small,
 .invite-access-item small {
   margin-top: 4px;
   color: var(--muted);
   font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
-.invite-card > .button {
+.invite-provider-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.invite-provider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .035);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.invite-provider:hover {
+  border-color: rgba(255, 255, 255, .28);
+  background: rgba(255, 255, 255, .06);
+}
+
+.invite-provider.recommended {
+  border-color: rgba(214, 255, 89, .34);
+  background: rgba(214, 255, 89, .065);
+}
+
+.invite-provider:disabled {
+  opacity: .58;
+  cursor: wait;
+}
+
+.invite-provider > span:last-child {
+  color: var(--soft);
+  font-size: 12px;
+}
+
+.invite-provider-name {
+  font-weight: 800;
+}
+
+.invite-provider-name em {
+  display: inline-flex;
+  margin-left: 7px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #10120c;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: .04em;
+}
+
+.invite-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.invite-access-list {
+  margin: 0 0 20px;
+}
+
+.invite-card > .button,
+.invite-confirm-actions .button {
   display: inline-flex;
   justify-content: center;
   text-decoration: none;
@@ -286,7 +397,10 @@
   .invite-admin-section { padding: 20px; }
   .invite-admin-grid,
   .invite-product-options { grid-template-columns: 1fr; }
-  .invite-link-row { grid-template-columns: 1fr; }
+  .invite-link-row,
+  .invite-provider { grid-template-columns: 1fr; }
   .invite-record { align-items: flex-start; }
   .invite-card { padding: 30px 24px; }
+  .invite-offer-heading { align-items: flex-start; }
+  .invite-confirm-actions { display: grid; grid-template-columns: 1fr; }
 }
