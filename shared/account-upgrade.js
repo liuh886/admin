@@ -18,6 +18,7 @@
       step2: 'Stripe 付款',
       step3: 'Pro 自动生效',
       continue: '选择登录方式继续',
+      signInSection: '登录或创建账户',
       stripe: 'Stripe 安全结账 · 可随时取消',
       checkout: '开通 {app} Pro',
     },
@@ -31,6 +32,7 @@
       step2: 'Pay with Stripe',
       step3: 'Pro activates',
       continue: 'Choose a sign-in method',
+      signInSection: 'Sign in or create an account',
       stripe: 'Secure checkout with Stripe · Cancel anytime',
       checkout: 'Upgrade to {app} Pro',
     },
@@ -113,6 +115,9 @@
     if (!guest || dialog.querySelector('.hao-upgrade-guide')) return;
 
     const t = text();
+    const statusChip = guest.querySelector('.hao-account-status-chip');
+    if (statusChip) statusChip.textContent = t.signInSection;
+
     const guide = element('section', 'hao-upgrade-guide');
     const head = element('div', 'hao-upgrade-guide-head');
     const copy = element('div', 'hao-upgrade-guide-copy');
