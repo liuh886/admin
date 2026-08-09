@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 
 const script = fs.readFileSync('shared/account-shell.js', 'utf8');
+const upgrade = fs.readFileSync('shared/account-upgrade.js', 'utf8');
 const css = fs.readFileSync('shared/account-shell.css', 'utf8');
+const portal = fs.readFileSync('supabase/functions/create-portal-session/index.ts', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/0006_shared_product_account_foundation.sql', 'utf8');
-const browser = `${script}\n${css}`;
+const browser = `${script}\n${upgrade}\n${css}`;
 
 function expect(condition, message) {
   if (!condition) throw new Error(message);
@@ -51,6 +53,29 @@ expect(css.includes('@media (max-width: 640px)'), 'Account shell must include mo
 expect(css.includes('prefers-reduced-motion'), 'Account shell must respect reduced motion');
 
 for (const required of [
+  'function removeInternalCapabilities(dialog)',
+  "dialog.querySelector('.hao-account-feature-panel')?.remove()",
+  'function ensureProManagement(dialog, snapshot)',
+  'if (!snapshot?.isPro) return',
+  "manage: '管理订阅'",
+  "manage: 'Manage subscription'",
+  'config.portalFunctionUrl',
+]) {
+  expect(upgrade.includes(required), `Shared Pro account upgrade is missing ${required}`);
+}
+expect(!upgrade.includes('if (!snapshot?.subscription)'), 'Subscription-management visibility must not depend on an existing Stripe subscription row');
+
+for (const required of [
+  'billing_customers',
+  'metadata[supabase_user_id]',
+  'hao-customer-${userData.user.id}',
+  'billing_portal/sessions',
+]) {
+  expect(portal.includes(required), `Stripe portal function is missing ${required}`);
+}
+expect(!portal.includes('No billing customer exists for this account'), 'Portal must create a Stripe customer when a Pro account does not have one yet');
+
+for (const required of [
   "const TURNSTILE_SITE_KEY = '0x4AAAAAAEKVMnWa2valozxW'",
   'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit',
   'function loadTurnstile()',
@@ -84,4 +109,4 @@ for (const forbidden of [
   expect(!forbidden.test(browser), `Shared browser assets contain forbidden secret material: ${forbidden}`);
 }
 
-console.log('Shared account shell uses Google, GitHub and X OAuth, embedded mounts, Turnstile-protected email auth, and no privileged secret.');
+console.log('Shared account UI keeps internal access rules private and gives every Pro account a Stripe subscription-management entry.');
