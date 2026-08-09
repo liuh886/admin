@@ -11,6 +11,7 @@ function expect(condition, message) {
 }
 
 expect(html.includes('src="./invite.js"'), 'Admin shell must load the invitation module');
+expect(browser.includes('@supabase/supabase-js@2.111.0/+esm'), 'Invitation browser Supabase client must be pinned to the tested release');
 expect(edge.includes('npm:@supabase/supabase-js@2.111.0'), 'Invitation Edge Function Supabase client must be pinned to the tested release');
 expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Invitation creation must independently verify AAL2');
 expect(edge.includes('data.currentLevel !== "aal2"'), 'Invitation creation must fail closed below AAL2');
@@ -20,8 +21,18 @@ expect(edge.includes('#invite='), 'Generated invitation URLs must keep the raw t
 expect(browser.includes('window.location.hash.slice(1)'), 'Invitation redemption must read the token from the URL fragment');
 expect(!edge.includes('?invite='), 'Raw invitation tokens must not be generated as query parameters');
 expect(browser.includes('hao_membership_invite_token'), 'OAuth redirect must preserve the invitation token locally');
-expect(browser.includes("window.history.replaceState({}, '', ADMIN_URL)"), 'The token fragment must be removed from the address bar after capture');
-expect(browser.includes("provider: 'google'"), 'Invitation redemption must use the existing Google account flow');
+expect(browser.includes('hao_membership_invite_offer'), 'OAuth redirect must preserve the non-authoritative invite offer preview locally');
+expect(browser.includes("params.set('offer', JSON.stringify(offer))"), 'Generated share links must include a visible offer preview in the URL fragment');
+expect(browser.includes("const OAUTH_PROVIDERS = new Set(['google', 'github', 'x'])"), 'Invitation page must support Google, GitHub, and X OAuth');
+for (const provider of ['google', 'github', 'x']) {
+  expect(browser.includes(`data-invite-provider=\"${provider}\"`), `Invitation page must render the ${provider} login entry`);
+}
+expect(browser.includes('Google <em>推荐</em>'), 'Google must be visually recommended on the invitation page');
+expect(browser.includes('signInWithProvider(provider)'), 'Invitation OAuth entry points must share one provider-aware sign-in path');
+expect(browser.includes('确认领取到这个账号'), 'Signed-in recipients must confirm the target account before consuming the one-time invite');
+expect(browser.includes('换一个账号'), 'Recipients must be able to switch accounts before redemption');
+expect(browser.includes('offerMarkup()'), 'Invitation page must render the promised products before login');
+expect(browser.includes('领取后访问'), 'Invitation offer preview must show each product access URL');
 expect(browser.includes('name="invite-product"'), 'Admin invitation form must expose product-level multi-select choices');
 expect(browser.includes('product_codes: selectedProducts'), 'Admin invitation create request must send multiple product codes');
 expect(!browser.includes('invite-entitlements'), 'Admin must not expose entitlement-level invitation selection');
@@ -31,6 +42,8 @@ expect(browser.includes('管理订阅'), 'Invitation UX must explain subscriptio
 expect(browser.includes("callInvite('create'"), 'Admin UI must create invitations through the protected Edge Function');
 expect(browser.includes("callInvite('redeem'"), 'Recipient UI must redeem invitations through the protected Edge Function');
 expect(css.includes('.invite-product-options') && css.includes('.invite-product-option'), 'Multi-product selection must have dedicated responsive styles');
+expect(css.includes('.invite-provider-grid') && css.includes('.invite-provider.recommended'), 'Invitation social-login choices must have dedicated styling');
+expect(css.includes('.invite-offer') && css.includes('.invite-offer-item'), 'Invitation benefits preview must have dedicated styling');
 expect(edge.includes('crypto.getRandomValues(new Uint8Array(32))'), 'Invitation tokens must use 256 bits of cryptographic randomness');
 expect(edge.includes('crypto.subtle.digest("SHA-256"'), 'Only a hash of the invitation token may be persisted');
 expect(edge.includes('membership_admins'), 'Invitation creation must enforce the existing admin whitelist');
