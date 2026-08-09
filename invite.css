@@ -20,7 +20,76 @@
   gap: 14px;
 }
 
-.invite-trial-note {
+.invite-product-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.invite-product-fieldset legend {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.invite-product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.invite-product-choice {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .018);
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease;
+}
+
+.invite-product-choice:hover {
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, .035);
+}
+
+.invite-product-choice:has(input:checked) {
+  border-color: rgba(214, 255, 89, .42);
+  background: rgba(214, 255, 89, .07);
+}
+
+.invite-product-choice input {
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+.invite-product-choice span,
+.invite-product-choice strong,
+.invite-product-choice small {
+  display: block;
+  min-width: 0;
+}
+
+.invite-product-choice strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.invite-product-choice small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invite-bundle-note {
   display: grid;
   gap: 6px;
   padding: 13px 14px;
@@ -29,12 +98,12 @@
   background: rgba(214, 255, 89, .045);
 }
 
-.invite-trial-note strong {
+.invite-bundle-note strong {
   color: var(--text);
   font-size: 12px;
 }
 
-.invite-trial-note span {
+.invite-bundle-note span {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.55;
@@ -162,6 +231,54 @@
   text-decoration: none;
 }
 
+.invite-product-links {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+
+.invite-product-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  background: rgba(255, 255, 255, .02);
+}
+
+.invite-product-link:hover {
+  border-color: rgba(214, 255, 89, .32);
+  background: rgba(214, 255, 89, .055);
+}
+
+.invite-product-link strong,
+.invite-product-link small {
+  display: block;
+}
+
+.invite-product-link small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.invite-success-mark {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 26px;
+  border-radius: 18px;
+  background: var(--success);
+  color: #0b1710;
+  font-size: 28px;
+  font-weight: 900;
+}
+
 .invite-footnote {
   margin: 14px 0 0;
   color: var(--muted);
@@ -180,7 +297,8 @@
 
 @media (max-width: 820px) {
   .invite-admin-section { padding: 20px; }
-  .invite-admin-grid { grid-template-columns: 1fr; }
+  .invite-admin-grid,
+  .invite-product-grid { grid-template-columns: 1fr; }
   .invite-link-row { grid-template-columns: 1fr; }
   .invite-record { align-items: flex-start; }
   .invite-card { padding: 30px 24px; }
