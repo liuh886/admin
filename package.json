@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "npm run test:contract && npm run test:e2e",
-    "test:contract": "node tests/membership-admin-contract.test.js && node tests/account-shell-contract.test.js && node tests/feedback-admin-contract.test.js && node tests/rhythmcoach-personal-library-contract.test.js",
+    "test:contract": "node tests/membership-admin-contract.test.js && node tests/account-shell-contract.test.js && node tests/feedback-admin-contract.test.js && node tests/rhythmcoach-personal-library-contract.test.js && node tests/membership-invite-contract.test.js",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
