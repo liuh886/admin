@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2.95.0";
+import { createClient } from "npm:@supabase/supabase-js@2.111.0";
 
 const ALLOWED_ORIGINS = new Set([
   "https://liuh886.github.io",
@@ -152,6 +152,13 @@ Deno.serve(async (req: Request) => {
   }
   const action = String(body.action ?? "catalog");
 
+  async function requireAal2(): Promise<void> {
+    const { data, error } = await userClient.auth.mfa.getAuthenticatorAssuranceLevel(token);
+    if (error || data.currentLevel !== "aal2") {
+      throw new Error("AAL2 multi-factor authentication is required to create membership invitations.");
+    }
+  }
+
   async function adminRole(): Promise<string | null> {
     const { data, error } = await admin
       .from("membership_admins")
@@ -287,6 +294,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "create") {
+      await requireAal2();
       const role = await adminRole();
       if (!role || !["owner", "operator"].includes(role)) {
         return json(req, { error: "This action requires operator access." }, 403);
