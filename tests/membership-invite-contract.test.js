@@ -11,6 +11,11 @@ function expect(condition, message) {
 }
 
 expect(html.includes('src="./invite.js"'), 'Admin shell must load the invitation module');
+expect(edge.includes('npm:@supabase/supabase-js@2.111.0'), 'Invitation Edge Function Supabase client must be pinned to the tested release');
+expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Invitation creation must independently verify AAL2');
+expect(edge.includes('data.currentLevel !== "aal2"'), 'Invitation creation must fail closed below AAL2');
+expect(edge.includes('if (action === "create")') && edge.includes('await requireAal2();'), 'Only privileged invitation creation must require AAL2');
+expect(edge.includes('if (action === "redeem")'), 'Recipient redemption must remain a separate customer action');
 expect(edge.includes('#invite='), 'Generated invitation URLs must keep the raw token in the URL fragment');
 expect(browser.includes('window.location.hash.slice(1)'), 'Invitation redemption must read the token from the URL fragment');
 expect(!edge.includes('?invite='), 'Raw invitation tokens must not be generated as query parameters');
