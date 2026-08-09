@@ -11,12 +11,16 @@ function expect(condition, message) {
 }
 
 expect(html.includes('src="./invite.js"'), 'Admin shell must load the invitation module');
-expect(browser.includes("?invite="), 'Invitation URLs must enter the redemption route through a token query parameter');
+expect(edge.includes('#invite='), 'Generated invitation URLs must keep the raw token in the URL fragment');
+expect(browser.includes('window.location.hash.slice(1)'), 'Invitation redemption must read the token from the URL fragment');
+expect(!edge.includes('?invite='), 'Raw invitation tokens must not be generated as query parameters');
 expect(browser.includes('hao_membership_invite_token'), 'OAuth redirect must preserve the invitation token locally');
+expect(browser.includes("window.history.replaceState({}, '', ADMIN_URL)"), 'The token fragment must be removed from the address bar after capture');
 expect(browser.includes("provider: 'google'"), 'Invitation redemption must use the existing Google account flow');
 expect(browser.includes('redemption.app_url'), 'Successful redemption must show the product access URL');
 expect(browser.includes("callInvite('create'"), 'Admin UI must create invitations through the protected Edge Function');
 expect(browser.includes("callInvite('redeem'"), 'Recipient UI must redeem invitations through the protected Edge Function');
+expect(browser.includes('invite-leave'), 'Invalid or used invitations must offer a clean exit from redemption mode');
 expect(css.includes('.invite-redemption'), 'Invitation redemption must have a dedicated full-screen surface');
 expect(edge.includes('crypto.getRandomValues(new Uint8Array(32))'), 'Invitation tokens must use 256 bits of cryptographic randomness');
 expect(edge.includes('crypto.subtle.digest("SHA-256"'), 'Only a hash of the invitation token may be persisted');
