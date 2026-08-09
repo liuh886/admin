@@ -1,17 +1,17 @@
 # Single-use Pro invitations
 
-The admin console can create one-time complimentary Pro invitation links that bundle one or more Hao Apps products.
+The admin console creates one-time free-trial invitation links for one or more Hao Apps Pro products.
 
 ## Admin flow
 
 1. Open `https://liuh886.github.io/admin/` as an `owner` or `operator`.
-2. In **一次性 Pro 产品包邀请**, select one or more Pro products.
-3. Select one complimentary duration for the whole bundle.
-4. Generate the invitation and copy the link immediately.
+2. Select one or more Pro products.
+3. Select one free-trial duration for the invitation.
+4. Generate the link and copy it immediately.
 
-The product is the configuration unit. Admin users do not choose low-level entitlement codes. Each selected product resolves its current `*.pro` mapping from `billing_product_entitlements`.
+Products are the configuration unit. The admin never selects low-level entitlement codes; each selected product resolves its current `*.pro` mapping from `billing_product_entitlements` and its default Stripe price from `billing_prices`.
 
-The original token is returned only when the invitation is created. The recent-invites list intentionally shows status but cannot reconstruct the link.
+The raw invitation token is returned only once. PostgreSQL stores only its SHA-256 hash.
 
 ## Recipient flow
 
@@ -21,31 +21,50 @@ The invitation URL uses a fragment:
 https://liuh886.github.io/admin/#invite=<token>
 ```
 
-The browser stores the token locally, removes it from the address bar, and uses the existing Supabase OAuth flow. After sign-in, the first authenticated account to redeem the token receives Pro grants for every product in the invitation. The complimentary duration starts at redemption time and is shared by the whole bundle.
+The browser stores the token locally, removes it from the address bar, and uses the existing Supabase OAuth flow. After sign-in, the first account to claim the invitation receives a real Stripe `trialing` subscription for each invited product that does not already have a manageable subscription.
 
-On success, the page lists every granted product with its canonical `billing_products.app_url` so the recipient can open each product directly.
+On success, the page lists each product, its trial end date, and the canonical `billing_products.app_url`.
 
 ## Membership behavior
 
-Invitation access is a complimentary grant, not a Stripe subscription. It does not create Checkout, collect a payment method, auto-renew, or charge after expiry.
+A free invitation is a Stripe-managed subscription trial, not a detached temporary entitlement.
 
-The grant reuses the existing membership foundation:
+For every selected product:
 
-- selected products are stored as `membership_invites.product_codes[]`;
-- each product resolves its current `*.pro` entitlement mapping;
-- grants are written to `entitlement_grants` with `source = 'invite'`;
-- `refresh_effective_entitlements` recalculates effective access immediately.
+- the existing default Stripe price is used;
+- `trial_period_days` is set from the invitation duration;
+- `trial_settings.end_behavior.missing_payment_method` is `cancel`;
+- the Stripe subscription is synchronized into `subscriptions`;
+- Pro grants use `source = 'stripe_subscription'` and the subscription ID as `source_ref`;
+- `refresh_effective_entitlements` updates effective access immediately;
+- the normal Stripe webhook remains the ongoing source of subscription-status reconciliation.
 
-Existing Stripe subscriptions and other grants remain independent and can overlap with invitation access.
+Because `trialing` is a manageable subscription state, the product account page exposes **Manage subscription** from the first day of the free trial. The account UI also shows the free-trial end date.
 
-## One-time guarantee
+If the user never adds a payment method, Stripe cancels the subscription at the end of the trial. If the user adds a payment method through the Stripe Customer Portal, the subscription can continue on the product's normal price after the trial.
 
-`membership_invites.token_hash` stores only a SHA-256 hash of a 256-bit random token. Redemption is executed by `redeem_membership_invite` inside PostgreSQL and locks the invitation row with `FOR UPDATE` before checking `redeemed_at`. The same link therefore cannot successfully grant two accounts under concurrent redemption.
+## Multi-product invitations
+
+One invitation may include several products. Each product receives its own Stripe subscription rather than a synthetic bundle subscription. This keeps product-level billing, account pages, entitlement mapping, and cancellation behavior independent.
+
+An existing manageable subscription for a selected product is preserved rather than duplicated.
+
+## One-time guarantee and retry behavior
+
+`membership_invites.token_hash` stores only a SHA-256 hash of a 256-bit random token.
+
+Redemption has three states:
+
+- unclaimed: `redeemed_by` and `redeemed_at` are null;
+- claimed / activation in progress: `redeemed_by` is set while `redeemed_at` remains null;
+- complete: both are set.
+
+The first authenticated account atomically claims the invitation. The same account may retry if activation is interrupted. Stripe idempotency keys are scoped by invitation and product, so retrying does not create duplicate subscriptions. A different account cannot take over a claimed invitation.
 
 ## Security boundary
 
-- Raw invitation tokens are never stored in PostgreSQL or the admin audit log.
+- Raw invitation tokens are never stored in PostgreSQL or audit logs.
 - Browser roles cannot read or mutate `membership_invites` directly.
 - Invitation creation requires an active `owner` or `operator` row in `membership_admins`.
-- Redemption requires a valid Supabase user JWT, but does not require an admin role.
-- Service-role credentials remain inside the `membership-invite` Edge Function.
+- Redemption requires a valid Supabase user JWT but no admin role.
+- Stripe and service-role secrets stay inside the `membership-invite` Edge Function.
