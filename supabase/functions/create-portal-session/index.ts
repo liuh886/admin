@@ -87,32 +87,17 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const input = await req.json().catch(() => ({})) as { product_code?: string };
-    const requestedCode = String(input.product_code ?? "").trim();
+    const productCode = String(input.product_code ?? "").trim();
 
     let returnUrl = "https://liuh886.github.io/";
-    if (requestedCode) {
-      let { data: product } = await admin
+    if (productCode) {
+      const { data: product, error: productError } = await admin
         .from("billing_products")
         .select("app_url")
-        .eq("product_code", requestedCode)
+        .eq("product_code", productCode)
         .eq("active", true)
         .maybeSingle();
-      if (!product) {
-        const { data: mapping } = await admin
-          .from("billing_product_entitlements")
-          .select("product_code")
-          .eq("entitlement_code", requestedCode)
-          .maybeSingle();
-        if (mapping) {
-          const result = await admin
-            .from("billing_products")
-            .select("app_url")
-            .eq("product_code", mapping.product_code)
-            .eq("active", true)
-            .maybeSingle();
-          product = result.data;
-        }
-      }
+      if (productError) throw productError;
       if (product?.app_url) returnUrl = product.app_url;
     }
 
