@@ -7,6 +7,7 @@
   const TURNSTILE_SITE_KEY = '0x4AAAAAAEKVMnWa2valozxW';
   const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
   const OAUTH_PROVIDERS = new Set(['google', 'github', 'x']);
+  const MANAGEABLE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid']);
 
   const state = {
     client: null,
@@ -15,10 +16,12 @@
     profile: null,
     productAccount: null,
     entitlements: new Set(),
+    subscription: null,
     loading: true,
     error: '',
     open: false,
     notice: '',
+    billingReturn: null,
   };
 
   const listeners = new Set();
@@ -44,11 +47,20 @@
       email: '邮箱地址', magic: '发送登录链接', sent: '登录链接已发送，请检查邮箱。',
       close: '关闭账户', signOut: '退出登录', refresh: '刷新账户', save: '保存名称', displayName: '显示名称',
       signedIn: '已登录', loading: '正在加载…', unavailable: '账户服务暂时不可用，请稍后重试。',
-      future: '账户能力', billingOff: '付费功能尚未开放。当前公开功能保持可用。', upgrade: '升级 · US$1/月', manage: '管理订阅',
+      billingUnavailable: '暂时无法打开 Stripe 付款或订阅管理页面。你的账户和现有权限不受影响。',
+      future: '账户能力', billingOff: '付费功能尚未开放。当前公开功能保持可用。', manage: '管理订阅',
       feedback: '提交反馈', feedbackPrompt: '告诉我哪些内容有帮助、哪里需要改进。', category: '反馈类型',
       general: '一般反馈', idea: '功能建议', bug: '问题报告', content: '内容反馈', other: '其他',
       message: '反馈内容', submit: '发送反馈', feedbackSent: '反馈已收到，谢谢。', profileSaved: '账户名称已保存。',
       privacy: '隐私与数据边界', captchaRequired: '请先完成人机验证。', captchaUnavailable: '人机验证暂时不可用，请稍后重试。',
+      proInvite: '成为 Pro', proInviteTitle: '成为 {app} Pro',
+      proInviteBody: 'Pro 是可选支持。现有公开功能继续可用；US$1/月会激活 Pro 身份，并支持这个产品持续维护。',
+      proPrice: 'US$1 / 月', stripeNote: '通过 Stripe 安全结账 · 可随时取消',
+      proAccess: 'Pro 权限已激活', proGranted: '此账户已拥有 Pro 权限，目前没有需要管理的付费订阅。',
+      paidActive: 'Pro 订阅有效', billingOpening: '正在前往 Stripe…',
+      billingSuccess: '付款已完成，Pro 权限已更新。',
+      billingPending: '付款已完成，正在确认 Pro 权限。你可以稍后刷新账户。',
+      billingCancelled: '未完成付款。Free 使用不受影响。', noSubscription: '当前没有需要管理的付费订阅。',
     },
     en: {
       account: 'Account', shared: 'Shared Hao Apps account', free: 'Free', pro: 'Pro', optional: 'OPTIONAL SIGN-IN',
@@ -56,11 +68,20 @@
       email: 'Email address', magic: 'Send sign-in link', sent: 'Sign-in link sent. Check your inbox.',
       close: 'Close account', signOut: 'Sign out', refresh: 'Refresh account', save: 'Save name', displayName: 'Display name',
       signedIn: 'Signed in', loading: 'Loading…', unavailable: 'Account service is temporarily unavailable. Try again shortly.',
-      future: 'Account capabilities', billingOff: 'Paid features are not open yet. Current public features remain available.', upgrade: 'Upgrade · US$1/month', manage: 'Manage subscription',
+      billingUnavailable: 'Stripe checkout or subscription management is temporarily unavailable. Your account and current access are unaffected.',
+      future: 'Account capabilities', billingOff: 'Paid features are not open yet. Current public features remain available.', manage: 'Manage subscription',
       feedback: 'Send feedback', feedbackPrompt: 'Tell us what helped and what should improve.', category: 'Feedback type',
       general: 'General', idea: 'Feature idea', bug: 'Bug report', content: 'Content feedback', other: 'Other',
       message: 'Your feedback', submit: 'Send feedback', feedbackSent: 'Feedback received. Thank you.', profileSaved: 'Account name saved.',
       privacy: 'Privacy and data boundary', captchaRequired: 'Complete the security check first.', captchaUnavailable: 'The security check is temporarily unavailable. Try again shortly.',
+      proInvite: 'Become Pro', proInviteTitle: 'Become {app} Pro',
+      proInviteBody: 'Pro is optional support. Existing public features stay available; US$1/month activates your Pro identity and supports ongoing maintenance.',
+      proPrice: 'US$1 / month', stripeNote: 'Secure checkout with Stripe · Cancel anytime',
+      proAccess: 'Pro access active', proGranted: 'This account already has Pro access and has no paid subscription to manage.',
+      paidActive: 'Pro subscription active', billingOpening: 'Opening Stripe…',
+      billingSuccess: 'Payment complete. Pro access is up to date.',
+      billingPending: 'Payment complete. Pro access is still being confirmed. You can refresh the account shortly.',
+      billingCancelled: 'Payment was not completed. Free access is unchanged.', noSubscription: 'There is no paid subscription to manage.',
     },
   };
 
@@ -69,6 +90,8 @@
     if (value && typeof value === 'object') return value[currentLanguage()] || value.en || value.zh || fallback;
     return value || fallback;
   };
+  const appName = () => String(config.appName || '').trim() || 'Hao Apps';
+  const formatText = (value) => String(value || '').replace('{app}', appName());
 
   const icon = (name) => {
     const icons = {
@@ -103,14 +126,12 @@
   function loadTurnstile() {
     if (window.turnstile?.render) return Promise.resolve(window.turnstile);
     if (turnstileLoader) return turnstileLoader;
-
     turnstileLoader = new Promise((resolve, reject) => {
       let script = document.querySelector('script[data-hao-turnstile]');
       const finish = () => window.turnstile?.render
         ? resolve(window.turnstile)
         : reject(new Error('Turnstile API did not initialize.'));
       const fail = () => reject(new Error('Turnstile API failed to load.'));
-
       if (!script) {
         script = document.createElement('script');
         script.src = TURNSTILE_SCRIPT_URL;
@@ -126,7 +147,6 @@
       turnstileLoader = null;
       throw error;
     });
-
     return turnstileLoader;
   }
 
@@ -163,6 +183,10 @@
     }
   }
 
+  function hasPaidSubscription() {
+    return Boolean(state.subscription && MANAGEABLE_SUBSCRIPTION_STATUSES.has(state.subscription.status));
+  }
+
   function snapshot() {
     return Object.freeze({
       configured: true,
@@ -172,6 +196,8 @@
       productAccount: state.productAccount,
       entitlements: [...state.entitlements],
       isPro: state.entitlements.has(config.entitlementCode),
+      subscription: state.subscription,
+      hasPaidSubscription: hasPaidSubscription(),
       error: state.error,
       productCode: config.productCode,
     });
@@ -255,14 +281,30 @@
     });
   }
 
+  async function refreshSubscription() {
+    state.subscription = null;
+    if (!state.user || !config.productCode) return;
+    const client = await getClient();
+    const { data, error } = await client.from('subscriptions')
+      .select('id,status,current_period_end,cancel_at_period_end')
+      .eq('user_id', state.user.id)
+      .eq('product_code', config.productCode);
+    if (error) throw error;
+    state.subscription = (data || []).find((row) => MANAGEABLE_SUBSCRIPTION_STATUSES.has(row.status)) || null;
+  }
+
   async function handleSession(session) {
     state.session = session || null;
     state.user = session?.user || null;
     state.profile = null;
     state.productAccount = null;
+    state.subscription = null;
     state.error = '';
-    if (state.user) await Promise.all([ensureProfile(), touchProductAccount(), refreshEntitlements()]);
-    else state.entitlements = new Set();
+    if (state.user) {
+      await Promise.all([ensureProfile(), touchProductAccount(), refreshEntitlements(), refreshSubscription()]);
+    } else {
+      state.entitlements = new Set();
+    }
     render();
     emit();
   }
@@ -424,9 +466,18 @@
     }
   }
 
-  async function callBilling(url) {
+  async function callBilling(url, mode) {
     if (!config.billingEnabled || !url || !state.user) return;
+    const t = text();
+    if (mode === 'portal' && !hasPaidSubscription()) {
+      state.notice = t.noSubscription;
+      state.error = '';
+      render();
+      return;
+    }
     state.loading = true;
+    state.error = '';
+    state.notice = t.billingOpening;
     render();
     try {
       const client = await getClient();
@@ -443,10 +494,21 @@
         body: JSON.stringify({ product_code: config.productCode }),
       });
       const payload = await response.json().catch(() => ({}));
+      if (mode === 'portal' && response.status === 404) {
+        state.loading = false;
+        state.notice = t.noSubscription;
+        state.error = '';
+        await refreshSubscription().catch(() => {});
+        render();
+        emit();
+        return;
+      }
       if (!response.ok || !payload.url) throw new Error(payload.error || `Membership request failed (${response.status})`);
       window.location.assign(payload.url);
     } catch (error) {
-      setError(error);
+      console.warn('Hao Account billing:', error);
+      state.error = t.billingUnavailable;
+      state.notice = '';
       state.loading = false;
       render();
     }
@@ -454,7 +516,7 @@
 
   function open() {
     state.open = true;
-    state.notice = '';
+    if (!state.billingReturn) state.notice = '';
     render();
     document.documentElement.classList.add('hao-account-open');
     window.setTimeout(() => overlayHost?.querySelector('[data-hao-close]')?.focus(), 0);
@@ -462,6 +524,7 @@
 
   function close() {
     state.open = false;
+    state.billingReturn = null;
     clearTurnstile();
     render();
     document.documentElement.classList.remove('hao-account-open');
@@ -481,6 +544,52 @@
     });
   }
 
+  function buildProCard(isPro) {
+    if (!config.billingEnabled) return null;
+    const t = text();
+    const paid = hasPaidSubscription();
+    const card = document.createElement('section');
+    card.className = `hao-account-pro-card${isPro ? ' is-active' : ''}`;
+
+    const copy = document.createElement('div');
+    copy.className = 'hao-account-pro-copy';
+    const kicker = document.createElement('span');
+    kicker.className = 'hao-account-pro-kicker';
+    kicker.textContent = isPro ? (paid ? t.paidActive : t.proAccess) : t.pro;
+    const title = document.createElement('strong');
+    title.textContent = isPro ? `${appName()} Pro` : formatText(t.proInviteTitle);
+    const body = document.createElement('p');
+    body.textContent = isPro
+      ? (paid ? t.stripeNote : t.proGranted)
+      : t.proInviteBody;
+    copy.append(kicker, title, body);
+
+    const action = document.createElement('div');
+    action.className = 'hao-account-pro-action';
+    if (!isPro) {
+      const price = document.createElement('span');
+      price.className = 'hao-account-pro-price';
+      price.textContent = t.proPrice;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'hao-account-primary';
+      button.textContent = t.proInvite;
+      button.addEventListener('click', () => void callBilling(config.checkoutFunctionUrl, 'checkout'));
+      const note = document.createElement('small');
+      note.className = 'hao-account-pro-note';
+      note.textContent = t.stripeNote;
+      action.append(price, button, note);
+    } else if (paid) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = t.manage;
+      button.addEventListener('click', () => void callBilling(config.portalFunctionUrl, 'portal'));
+      action.appendChild(button);
+    }
+    card.append(copy, action);
+    return card;
+  }
+
   function renderTrigger() {
     if (!triggerHost) return;
     const t = text();
@@ -493,8 +602,8 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `hao-account-trigger${state.user ? ' is-signed-in' : ''}${isPro ? ' is-pro' : ''}`;
-    button.setAttribute('aria-label', `${config.appName || ''} ${t.account}`.trim());
-    button.title = `${config.appName || ''} ${t.account}`.trim();
+    button.setAttribute('aria-label', `${appName()} ${t.account}`.trim());
+    button.title = `${appName()} ${t.account}`.trim();
     const visual = document.createElement('span');
     visual.className = 'hao-account-trigger-visual';
     if (avatar) {
@@ -540,7 +649,7 @@
     const header = document.createElement('header');
     header.innerHTML = `<div><span class="hao-account-eyebrow"></span><h2 id="hao-account-title"></h2></div>`;
     header.querySelector('.hao-account-eyebrow').textContent = isPro ? t.pro : t.shared;
-    header.querySelector('h2').textContent = localized(config.title, `${config.appName || ''} ${t.account}`.trim());
+    header.querySelector('h2').textContent = localized(config.title, `${appName()} ${t.account}`.trim());
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
     closeButton.className = 'hao-account-close';
@@ -572,7 +681,6 @@
       badge.className = 'hao-account-status-chip';
       badge.textContent = t.optional;
       guest.appendChild(badge);
-
       for (const provider of ['google', 'github', 'x']) {
         const button = document.createElement('button');
         button.type = 'button';
@@ -583,7 +691,6 @@
         button.addEventListener('click', () => void signInWithProvider(provider));
         guest.appendChild(button);
       }
-
       const divider = document.createElement('div');
       divider.className = 'hao-account-divider';
       divider.textContent = t.or;
@@ -629,9 +736,12 @@
       identityCopy.append(name, email);
       const tier = document.createElement('span');
       tier.className = `hao-account-tier${isPro ? ' is-pro' : ''}`;
-      tier.textContent = isPro ? `${config.appName || ''} Pro` : t.free;
+      tier.textContent = isPro ? `${appName()} Pro` : t.free;
       identity.append(visual, identityCopy, tier);
       account.appendChild(identity);
+
+      const proCard = buildProCard(isPro);
+      if (proCard) account.appendChild(proCard);
 
       const profileForm = document.createElement('form');
       profileForm.className = 'hao-account-profile-form';
@@ -691,21 +801,6 @@
 
       const actions = document.createElement('div');
       actions.className = 'hao-account-actions';
-      if (config.billingEnabled && !isPro && config.checkoutFunctionUrl) {
-        const upgrade = document.createElement('button');
-        upgrade.type = 'button';
-        upgrade.textContent = t.upgrade;
-        upgrade.className = 'hao-account-primary';
-        upgrade.addEventListener('click', () => void callBilling(config.checkoutFunctionUrl));
-        actions.appendChild(upgrade);
-      }
-      if (config.billingEnabled && isPro && config.portalFunctionUrl) {
-        const manage = document.createElement('button');
-        manage.type = 'button';
-        manage.textContent = t.manage;
-        manage.addEventListener('click', () => void callBilling(config.portalFunctionUrl));
-        actions.appendChild(manage);
-      }
       const refreshButton = document.createElement('button');
       refreshButton.type = 'button';
       refreshButton.innerHTML = `${icon('refresh')}<span>${t.refresh}</span>`;
@@ -742,7 +837,7 @@
     if (state.error) {
       const error = document.createElement('p');
       error.className = 'hao-account-error';
-      error.textContent = state.error === t.captchaRequired ? state.error : t.unavailable;
+      error.textContent = state.error === t.captchaRequired || state.error === t.billingUnavailable ? state.error : t.unavailable;
       dialog.appendChild(error);
     }
     if (state.loading) {
@@ -782,13 +877,11 @@
       triggerHost.id = `hao-account-${config.productCode || 'app'}`;
       triggerHost.className = 'hao-account-mount is-embedded';
     }
-
     const target = findMount();
     if (!target) {
       triggerHost.remove();
       return false;
     }
-
     if (triggerHost.parentElement !== target) {
       if (config.mountPosition === 'prepend') target.prepend(triggerHost);
       else target.appendChild(triggerHost);
@@ -808,7 +901,39 @@
     mountObserver.observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  function readBillingReturn() {
+    const url = new URL(window.location.href);
+    const billing = url.searchParams.get('billing');
+    if (billing !== 'success' && billing !== 'cancelled') return;
+    state.billingReturn = billing;
+    url.searchParams.delete('billing');
+    url.searchParams.delete('session_id');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  async function confirmBillingReturn() {
+    if (!state.user || !state.billingReturn) return;
+    const t = text();
+    state.open = true;
+    document.documentElement.classList.add('hao-account-open');
+    if (state.billingReturn === 'cancelled') {
+      state.notice = t.billingCancelled;
+      render();
+      return;
+    }
+    const waits = [0, 700, 1400];
+    for (const wait of waits) {
+      if (wait) await new Promise((resolve) => window.setTimeout(resolve, wait));
+      await Promise.all([refreshEntitlements(), refreshSubscription()]).catch(() => {});
+      if (state.entitlements.has(config.entitlementCode)) break;
+    }
+    state.notice = state.entitlements.has(config.entitlementCode) ? t.billingSuccess : t.billingPending;
+    render();
+    emit();
+  }
+
   async function initialise() {
+    readBillingReturn();
     overlayHost = document.createElement('div');
     overlayHost.id = 'hao-account-overlay';
     overlayHost.hidden = true;
@@ -823,6 +948,7 @@
       const { data, error } = await client.auth.getSession();
       if (error) throw error;
       await handleSession(data.session);
+      await confirmBillingReturn();
       client.auth.onAuthStateChange((_event, session) => {
         window.setTimeout(() => void handleSession(session), 0);
       });
