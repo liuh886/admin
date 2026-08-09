@@ -20,44 +20,24 @@
   gap: 14px;
 }
 
-.invite-entitlement-fieldset {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.invite-trial-note {
+  display: grid;
+  gap: 6px;
+  padding: 13px 14px;
+  border: 1px solid rgba(214, 255, 89, .16);
+  border-radius: var(--radius-sm);
+  background: rgba(214, 255, 89, .045);
 }
 
-.invite-entitlement-fieldset legend,
-.invite-result-ready > span,
-.invite-destination > span {
-  display: block;
-  margin-bottom: 8px;
+.invite-trial-note strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.invite-trial-note span {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
-}
-
-.invite-check-list {
-  display: grid;
-  gap: 8px;
-}
-
-.invite-check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--panel-soft);
-  color: var(--soft);
-}
-
-.invite-check input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
+  line-height: 1.55;
 }
 
 .invite-result-panel {
@@ -83,6 +63,14 @@
 .invite-result-ready > strong {
   font-size: 24px;
   letter-spacing: -.03em;
+}
+
+.invite-result-ready > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .invite-link-row {
@@ -162,7 +150,7 @@
 }
 
 .invite-lead {
-  max-width: 50ch;
+  max-width: 52ch;
   margin: 0 0 26px;
   color: var(--soft);
   line-height: 1.72;
@@ -189,51 +177,6 @@
   color: var(--danger);
   line-height: 1.55;
 }
-
-.invite-success-mark {
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  margin-bottom: 26px;
-  border-radius: 17px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 30px;
-  font-weight: 900;
-}
-
-.invite-entitlements {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 22px;
-}
-
-.invite-entitlements span {
-  padding: 7px 10px;
-  border: 1px solid rgba(214, 255, 89, .22);
-  border-radius: 999px;
-  color: var(--accent);
-  background: rgba(214, 255, 89, .06);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.invite-destination {
-  margin: 0 0 22px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--panel-soft);
-}
-
-.invite-destination a {
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-
-.invite-open-button { width: 100%; }
 
 @media (max-width: 820px) {
   .invite-admin-section { padding: 20px; }
