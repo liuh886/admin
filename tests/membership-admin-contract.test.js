@@ -19,6 +19,14 @@ expect(script.includes("redirectUrl: 'https://liuh886.github.io/admin/'"), 'Cano
 expect(!combinedBrowser.includes('https://liuh886.github.io/FlappyK/admin/'), 'Legacy FlappyK URL must not remain in the standalone frontend');
 expect(script.includes('/functions/v1/membership-admin'), 'Frontend must call the protected admin function');
 expect(operationsScript.includes('/functions/v1/operations-overview'), 'Frontend must call the protected overview function');
+expect(script.includes('@supabase/supabase-js@2.111.0/+esm'), 'Admin browser Supabase client must be pinned to the tested release');
+expect(edge.includes('npm:@supabase/supabase-js@2.111.0'), 'Membership Edge Function Supabase client must be pinned to the tested release');
+expect(script.includes('getAuthenticatorAssuranceLevel()'), 'Admin browser must check authenticator assurance level');
+expect(script.includes("factorType: 'totp'"), 'Admin browser must support TOTP enrollment');
+expect(script.includes("data.currentLevel === 'aal2'"), 'Admin console must require an AAL2 session before opening');
+expect(edge.includes('MUTATING_ACTIONS'), 'Membership Edge Function must classify privileged mutations');
+expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Membership Edge Function must independently verify AAL2');
+expect(edge.includes('data.currentLevel !== "aal2"'), 'Membership mutations must fail closed below AAL2');
 expect(html.includes('id="business-overview"'), 'Traffic and revenue overview must be present');
 expect(html.includes('id="growth-chart"'), 'Growth trend chart must be present');
 expect(html.includes('id="momentum-rows"'), 'Product momentum table must be present');
@@ -56,7 +64,7 @@ expect(edge.includes('"CANCEL"') && edge.includes('Type CANCEL to confirm subscr
 expect(migration.includes('membership_admin_actions'), 'Audit table migration must be present');
 expect(migration.includes('sync_owner_pro_entitlements'), 'Owner role must automatically materialize product Pro access');
 expect(migration.includes("'owner'"), 'Owner grants must use an explicit owner source');
-expect(migration.includes("valid_until"), 'Owner Pro grants must support permanent access');
+expect(migration.includes('valid_until'), 'Owner Pro grants must support permanent access');
 expect(migration.includes("entitlement_code like '%.pro'"), 'Owner access must follow product Pro mappings');
 expect(denyMigration.includes('using (false)'), 'Browser roles must be explicitly denied');
 expect(!combinedBrowser.match(/sk_(?:live|test)_[A-Za-z0-9]/), 'Stripe secret must never be committed to the browser');
