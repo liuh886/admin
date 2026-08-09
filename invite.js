@@ -234,7 +234,7 @@ function renderInviteSuccess(root, result) {
           </a>`).join('')}
       </div>
       <button id="invite-leave" class="button ghost" type="button">返回 Hao Apps</button>
-      <p class="invite-footnote">订阅管理、付款方式和取消操作均由 Stripe 提供；Pro 权益由订阅状态自动同步。</p>
+      <p class="invite-footnote">管理订阅、付款方式和取消操作均由 Stripe 提供；Pro 权益由订阅状态自动同步。</p>
     </div>`;
   root.querySelector('#invite-leave')?.addEventListener('click', leaveInviteMode);
 }
