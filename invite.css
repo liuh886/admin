@@ -20,6 +20,75 @@
   gap: 14px;
 }
 
+.invite-products-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.invite-products-fieldset legend {
+  margin-bottom: 8px;
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.invite-product-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.invite-product-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .025);
+  cursor: pointer;
+}
+
+.invite-product-option:has(input:checked) {
+  border-color: rgba(214, 255, 89, .34);
+  background: rgba(214, 255, 89, .055);
+}
+
+.invite-product-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.invite-product-option span,
+.invite-product-option strong,
+.invite-product-option small {
+  display: block;
+  min-width: 0;
+}
+
+.invite-product-option strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invite-product-option small {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .invite-trial-note {
   display: grid;
   gap: 6px;
@@ -156,6 +225,41 @@
   line-height: 1.72;
 }
 
+.invite-access-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+
+.invite-access-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .025);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.invite-access-item:hover {
+  border-color: rgba(214, 255, 89, .28);
+  background: rgba(214, 255, 89, .04);
+}
+
+.invite-access-item strong,
+.invite-access-item small {
+  display: block;
+}
+
+.invite-access-item small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .invite-card > .button {
   display: inline-flex;
   justify-content: center;
@@ -180,7 +284,8 @@
 
 @media (max-width: 820px) {
   .invite-admin-section { padding: 20px; }
-  .invite-admin-grid { grid-template-columns: 1fr; }
+  .invite-admin-grid,
+  .invite-product-options { grid-template-columns: 1fr; }
   .invite-link-row { grid-template-columns: 1fr; }
   .invite-record { align-items: flex-start; }
   .invite-card { padding: 30px 24px; }
