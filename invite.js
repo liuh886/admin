@@ -29,7 +29,6 @@ function formatDate(value, fallback = '—') {
 }
 
 function formatDuration(days) {
-  if (days === null || days === undefined || days === '') return '永久';
   const value = Number(days);
   if (value === 365) return '1 年';
   return `${value} 天`;
@@ -89,11 +88,11 @@ function renderInviteLogin(message = '') {
     <div class="invite-card">
       <div class="brand-mark" aria-hidden="true">H</div>
       <p class="eyebrow">HAO APPS · PRO INVITATION</p>
-      <h1>你收到了一份 Pro 邀请</h1>
-      <p class="invite-lead">登录共享 Hao Apps 账户即可领取。这个链接只能成功使用一次，免费时长从领取时开始计算。</p>
+      <h1>你收到了一份 Pro 免费体验</h1>
+      <p class="invite-lead">登录共享 Hao Apps 账户后，会进入 Stripe 确认这段 0 元订阅期。免费期内也可以管理或取消订阅。</p>
       ${message ? `<p class="invite-status" data-kind="error">${escapeHtml(message)}</p>` : ''}
-      <button id="invite-login" class="button primary" type="button">使用 Google 登录并领取</button>
-      <p class="invite-footnote">登录完成后会自动领取，并显示产品访问地址。</p>
+      <button id="invite-login" class="button primary" type="button">使用 Google 登录并继续</button>
+      <p class="invite-footnote">Stripe 免费期无需立即付款。未添加付款方式时，到期自动取消；主动添加付款方式后才会按正常价格续订。</p>
     </div>`;
   root.querySelector('#invite-login')?.addEventListener('click', async () => {
     const button = root.querySelector('#invite-login');
@@ -116,42 +115,23 @@ async function redeemInvite(session) {
     <div class="invite-card">
       <div class="brand-mark" aria-hidden="true">H</div>
       <p class="eyebrow">HAO APPS · PRO INVITATION</p>
-      <h1>正在领取邀请</h1>
-      <p class="invite-lead">正在为 ${escapeHtml(session.user.email || '当前账户')} 开通权益…</p>
+      <h1>正在准备免费订阅</h1>
+      <p class="invite-lead">正在为 ${escapeHtml(session.user.email || '当前账户')} 创建 Stripe 免费体验…</p>
     </div>`;
   try {
     const result = await callInvite('redeem', { token: inviteToken });
-    const redemption = typeof result.redemption === 'string'
-      ? JSON.parse(result.redemption)
-      : (result.redemption || {});
+    if (!result.checkout_url) throw new Error('Stripe Checkout 地址未生成。');
     localStorage.removeItem(STORAGE_KEY);
-    window.history.replaceState({}, '', ADMIN_URL);
-    const entitlements = Array.isArray(redemption.entitlement_codes) ? redemption.entitlement_codes : [];
-    const validity = redemption.valid_until ? `有效至 ${formatDate(redemption.valid_until)}` : '永久有效';
-    root.innerHTML = `
-      <div class="invite-card invite-success-card">
-        <div class="invite-success-mark" aria-hidden="true">✓</div>
-        <p class="eyebrow">INVITATION ACCEPTED</p>
-        <h1>${escapeHtml(redemption.product_name || 'Pro')} 已开通</h1>
-        <p class="invite-lead">${escapeHtml(result.user?.email || session.user.email || '')} · ${escapeHtml(validity)}</p>
-        <div class="invite-entitlements">
-          ${entitlements.map((code) => `<span>${escapeHtml(code)}</span>`).join('')}
-        </div>
-        <div class="invite-destination">
-          <span>访问地址</span>
-          <a href="${escapeHtml(redemption.app_url || '#')}" target="_blank" rel="noreferrer">${escapeHtml(redemption.app_url || '—')}</a>
-        </div>
-        <a class="button primary invite-open-button" href="${escapeHtml(redemption.app_url || '#')}" target="_blank" rel="noreferrer">打开产品</a>
-      </div>`;
+    window.location.assign(result.checkout_url);
   } catch (error) {
     root.innerHTML = `
       <div class="invite-card">
         <div class="brand-mark" aria-hidden="true">H</div>
         <p class="eyebrow">HAO APPS · PRO INVITATION</p>
-        <h1>这份邀请无法领取</h1>
+        <h1>这份邀请暂时无法继续</h1>
         <p class="invite-status" data-kind="error">${escapeHtml(error.message)}</p>
         <button id="invite-leave" class="button ghost" type="button">返回 Hao Apps</button>
-        <p class="invite-footnote">一次性邀请被领取后不能再次使用。</p>
+        <p class="invite-footnote">一次性邀请被其他账户领取后不能再次使用；同一账户取消 Stripe Checkout 后可以从原链接继续。</p>
       </div>`;
     root.querySelector('#invite-leave')?.addEventListener('click', leaveInviteMode);
   } finally {
@@ -159,40 +139,29 @@ async function redeemInvite(session) {
   }
 }
 
-function entitlementRows(catalog, productCode) {
-  return (catalog.mappings || []).filter((item) => item.product_code === productCode);
-}
-
-function renderEntitlementOptions(catalog) {
-  const product = document.querySelector('#invite-product');
-  const target = document.querySelector('#invite-entitlements');
-  if (!product || !target) return;
-  const rows = entitlementRows(catalog, product.value);
-  target.innerHTML = rows.length
-    ? rows.map((item) => `
-      <label class="invite-check">
-        <input type="checkbox" name="invite-entitlement" value="${escapeHtml(item.entitlement_code)}" checked>
-        <span>${escapeHtml(item.entitlement_code)}</span>
-      </label>`).join('')
-    : '<p class="empty-copy">这个产品还没有可邀请的权益映射。</p>';
-}
-
 function renderRecentInvites(catalog) {
   const target = document.querySelector('#invite-recent-list');
   if (!target) return;
   const productMap = new Map((catalog.products || []).map((item) => [item.product_code, item.name]));
   const rows = catalog.recent_invites || [];
-  target.innerHTML = rows.length ? rows.map((item) => `
-    <article class="invite-record">
-      <div>
-        <strong>${escapeHtml(productMap.get(item.product_code) || item.product_code)}</strong>
-        <span>${escapeHtml((item.entitlement_codes || []).join(' · '))} · ${escapeHtml(formatDuration(item.duration_days))}</span>
-      </div>
-      <div class="invite-record-status">
-        <span class="badge ${item.redeemed_at ? 'inactive' : 'active'}">${item.redeemed_at ? '已领取' : '可用'}</span>
-        <small>${escapeHtml(item.redeemed_at ? formatDate(item.redeemed_at) : formatDate(item.created_at))}</small>
-      </div>
-    </article>`).join('') : '<p class="empty-copy">尚未生成邀请。</p>';
+  target.innerHTML = rows.length ? rows.map((item) => {
+    const state = item.redeemed_at
+      ? { label: '已激活', className: 'inactive', date: item.redeemed_at }
+      : item.redeemed_by
+        ? { label: '结账中', className: 'active', date: item.created_at }
+        : { label: '可用', className: 'active', date: item.created_at };
+    return `
+      <article class="invite-record">
+        <div>
+          <strong>${escapeHtml(productMap.get(item.product_code) || item.product_code)}</strong>
+          <span>${escapeHtml(formatDuration(item.duration_days))}免费体验 · Stripe 订阅</span>
+        </div>
+        <div class="invite-record-status">
+          <span class="badge ${state.className}">${state.label}</span>
+          <small>${escapeHtml(formatDate(state.date))}</small>
+        </div>
+      </article>`;
+  }).join('') : '<p class="empty-copy">尚未生成邀请。</p>';
 }
 
 function ensureAdminModule(catalog) {
@@ -205,8 +174,8 @@ function ensureAdminModule(catalog) {
       <div class="section-heading">
         <div>
           <p class="eyebrow">PRO INVITATIONS</p>
-          <h2>一次性邀请</h2>
-          <p>选择产品、权益与免费时长，生成一条只能成功领取一次的注册链接。</p>
+          <h2>一次性免费体验邀请</h2>
+          <p>选择产品与免费时长。领取后创建真实 Stripe 订阅，免费期价格为 0，并从第一天开放订阅管理。</p>
         </div>
       </div>
       <div class="invite-admin-grid">
@@ -219,14 +188,14 @@ function ensureAdminModule(catalog) {
                 <option value="7">7 天</option>
                 <option value="30" selected>30 天</option>
                 <option value="90">90 天</option>
+                <option value="180">180 天</option>
                 <option value="365">1 年</option>
-                <option value="">永久</option>
               </select>
             </label>
-            <fieldset class="invite-entitlement-fieldset full">
-              <legend>权益</legend>
-              <div id="invite-entitlements" class="invite-check-list"></div>
-            </fieldset>
+            <div class="full invite-trial-note">
+              <strong>Stripe 订阅规则</strong>
+              <span>免费期内金额为 0；用户可随时进入 Customer Portal 管理或取消。未添加付款方式时，到期自动取消。</span>
+            </div>
             <button class="button primary full" type="submit">生成一次性邀请</button>
           </form>
           <p id="invite-admin-status" class="status-line" role="status" aria-live="polite"></p>
@@ -249,9 +218,7 @@ function ensureAdminModule(catalog) {
   productSelect.innerHTML = (catalog.products || [])
     .map((product) => `<option value="${escapeHtml(product.product_code)}">${escapeHtml(product.name)}</option>`)
     .join('');
-  renderEntitlementOptions(catalog);
   renderRecentInvites(catalog);
-  productSelect.onchange = () => renderEntitlementOptions(catalog);
 
   const form = section.querySelector('#invite-create-form');
   const status = section.querySelector('#invite-admin-status');
@@ -264,34 +231,26 @@ function ensureAdminModule(catalog) {
   form.onsubmit = async (event) => {
     event.preventDefault();
     if (!catalog.can_create) return;
-    const selected = [...section.querySelectorAll('input[name="invite-entitlement"]:checked')].map((item) => item.value);
-    if (!selected.length) {
-      status.textContent = '至少选择一项权益。';
-      status.dataset.kind = 'error';
-      return;
-    }
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
     status.textContent = '正在生成一次性链接…';
     delete status.dataset.kind;
     try {
+      const duration = Number(section.querySelector('#invite-duration').value);
       const result = await callInvite('create', {
         product_code: productSelect.value,
-        entitlement_codes: selected,
-        duration_days: section.querySelector('#invite-duration').value === ''
-          ? null
-          : Number(section.querySelector('#invite-duration').value)
+        duration_days: duration
       });
       const resultBox = section.querySelector('#invite-result');
       resultBox.className = 'invite-result-ready';
       resultBox.innerHTML = `
         <strong>${escapeHtml(result.product?.name || result.product?.product_code || 'Pro')}</strong>
-        <span>${escapeHtml(selected.join(' · '))} · ${escapeHtml(formatDuration(result.duration_days))}</span>
+        <span>${escapeHtml(formatDuration(result.duration_days))}免费体验 · Stripe 订阅</span>
         <div class="invite-link-row">
           <input id="invite-generated-link" type="text" readonly value="${escapeHtml(result.invite_url)}">
           <button id="invite-copy-link" class="button ghost compact" type="button">复制链接</button>
         </div>
-        <small>请现在复制并发送；刷新页面后无法恢复这条原始链接。</small>`;
+        <small>领取人登录后会进入 Stripe 0 元 Checkout。免费期可管理订阅；没有付款方式时，到期自动取消。</small>`;
       resultBox.querySelector('#invite-copy-link')?.addEventListener('click', async () => {
         await navigator.clipboard.writeText(result.invite_url);
         resultBox.querySelector('#invite-copy-link').textContent = '已复制';
