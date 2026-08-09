@@ -1,9 +1,16 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.111.0";
 
 const ALLOWED_ORIGINS = new Set([
   "https://liuh886.github.io",
   "http://localhost:4173",
   "http://localhost:8000",
+]);
+const MUTATING_ACTIONS = new Set([
+  "grant",
+  "extend_grant",
+  "revoke_grant",
+  "cancel_subscription",
+  "refund",
 ]);
 
 function namedEnv(name: string, legacyName: string): string {
@@ -153,6 +160,12 @@ Deno.serve(async (req: Request) => {
   }
   const action = String(requestBody.action ?? "bootstrap");
 
+  const requireAal2 = async () => {
+    const { data, error } = await userClient.auth.mfa.getAuthenticatorAssuranceLevel(token);
+    if (error || data.currentLevel !== "aal2") {
+      throw new Error("AAL2 multi-factor authentication is required for this administrative action.");
+    }
+  };
   const requireOperator = () => {
     if (!["owner", "operator"].includes(String(adminRow.role))) throw new Error("This action requires operator access.");
   };
@@ -252,6 +265,8 @@ Deno.serve(async (req: Request) => {
   };
 
   try {
+    if (MUTATING_ACTIONS.has(action)) await requireAal2();
+
     if (action === "bootstrap") {
       const [{ data: products }, { data: mappings }, userCount, subscriptionCount, grantCount, actionCount, { data: recentActions }] = await Promise.all([
         admin.from("billing_products").select("product_code,name,app_url,active").eq("active", true).order("name"),
