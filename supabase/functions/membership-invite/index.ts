@@ -126,7 +126,7 @@ Deno.serve(async (req: Request) => {
       const [{ data: products, error: productError }, { data: mappings, error: mappingError }, { data: invites, error: inviteError }] = await Promise.all([
         admin.from("billing_products").select("product_code,name,app_url,active").eq("active", true).order("name"),
         admin.from("billing_product_entitlements").select("product_code,entitlement_code").order("product_code").order("entitlement_code"),
-        admin.from("membership_invites").select("id,product_code,entitlement_codes,duration_days,created_at,redeemed_at,redeemed_by").order("created_at", { ascending: false }).limit(20),
+        admin.from("membership_invites").select("id,product_code,entitlement_codes,duration_days,created_at,redeemed_at").order("created_at", { ascending: false }).limit(20),
       ]);
       if (productError) throw productError;
       if (mappingError) throw mappingError;
@@ -196,7 +196,7 @@ Deno.serve(async (req: Request) => {
         product,
         entitlement_codes: selectedEntitlements,
         duration_days: days,
-        invite_url: `${ADMIN_URL}?invite=${encodeURIComponent(rawToken)}`,
+        invite_url: `${ADMIN_URL}#invite=${encodeURIComponent(rawToken)}`,
       });
     }
 
