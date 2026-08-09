@@ -7,7 +7,7 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 const ADMIN_URL = "https://liuh886.github.io/admin/";
-const MAX_DURATION_DAYS = 3650;
+const MAX_DURATION_DAYS = 730;
 
 function namedEnv(name: string, legacyName: string): string {
   const raw = Deno.env.get(name);
