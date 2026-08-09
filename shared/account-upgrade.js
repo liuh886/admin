@@ -23,6 +23,7 @@
       stripe: 'Stripe 安全结账 · 可随时取消',
       checkout: '开通 {app} Pro',
       manage: '管理订阅',
+      proManageBody: 'Pro 权限已激活。订阅、付款方式与取消操作可从下方统一管理。',
       portalOpening: '正在前往 Stripe…',
       portalUnavailable: '暂时无法打开订阅管理。Pro 权益不受影响。',
       trialActive: 'PRO · 免费体验中',
@@ -42,6 +43,7 @@
       stripe: 'Secure checkout with Stripe · Cancel anytime',
       checkout: 'Upgrade to {app} Pro',
       manage: 'Manage subscription',
+      proManageBody: 'Pro access is active. Manage subscription, payment, and cancellation settings below.',
       portalOpening: 'Opening Stripe…',
       portalUnavailable: 'Subscription management is temporarily unavailable. Your Pro access is unaffected.',
       trialActive: 'PRO · FREE TRIAL',
@@ -181,6 +183,14 @@
     if (button) button.textContent = localized(upgrade.ctaTitle, format(text().checkout));
   }
 
+  function enhanceProCard(dialog, snapshot) {
+    if (!snapshot?.isPro) return;
+    const card = dialog.querySelector('.hao-account-pro-card.is-active');
+    if (!card) return;
+    const body = card.querySelector('.hao-account-pro-copy p');
+    if (body) body.textContent = text().proManageBody;
+  }
+
   function enhanceTrialCard(dialog, snapshot) {
     if (snapshot?.subscription?.status !== 'trialing') return;
     const card = dialog.querySelector('.hao-account-pro-card.is-active');
@@ -245,6 +255,7 @@
     buildPlanPanel(dialog);
     buildGuestGuide(dialog);
     enhanceSignedInCard(dialog);
+    enhanceProCard(dialog, snapshot);
     enhanceTrialCard(dialog, snapshot);
     ensureProManagement(dialog, snapshot);
   }
