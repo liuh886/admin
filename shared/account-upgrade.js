@@ -6,6 +6,7 @@
   if (!config.enabled || !config.billingEnabled || !upgrade) return;
 
   const intentKey = `hao:upgrade-intent:${config.productCode || 'app'}`;
+  let latestSnapshot = window.HaoAccount?.getState?.() || null;
 
   const words = {
     zh: {
@@ -21,6 +22,8 @@
       signInSection: '登录或创建账户',
       stripe: 'Stripe 安全结账 · 可随时取消',
       checkout: '开通 {app} Pro',
+      trialActive: 'PRO · 免费体验中',
+      trialBody: '免费体验有效至 {date}。这是一个可管理的 Stripe 订阅，你可以随时查看订阅、管理付款方式或取消。',
     },
     en: {
       plans: 'Free and Pro',
@@ -35,6 +38,8 @@
       signInSection: 'Sign in or create an account',
       stripe: 'Secure checkout with Stripe · Cancel anytime',
       checkout: 'Upgrade to {app} Pro',
+      trialActive: 'PRO · FREE TRIAL',
+      trialBody: 'Your free trial runs through {date}. This is a manageable Stripe subscription: you can review it, manage payment details, or cancel at any time.',
     },
   };
 
@@ -58,6 +63,15 @@
 
   function format(value) {
     return String(value || '').replace('{app}', appName());
+  }
+
+  function formatDate(value) {
+    if (!value) return language() === 'zh' ? '体验期结束日' : 'the trial end date';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return language() === 'zh' ? '体验期结束日' : 'the trial end date';
+    return new Intl.DateTimeFormat(language() === 'zh' ? 'zh-CN' : 'en-US', {
+      year: 'numeric', month: 'short', day: 'numeric'
+    }).format(date);
   }
 
   function element(tag, className, value) {
@@ -157,12 +171,24 @@
     if (button) button.textContent = localized(upgrade.ctaTitle, format(text().checkout));
   }
 
-  function enhance() {
+  function enhanceTrialCard(dialog, snapshot) {
+    if (snapshot?.subscription?.status !== 'trialing') return;
+    const card = dialog.querySelector('.hao-account-pro-card.is-active');
+    if (!card) return;
+    const kicker = card.querySelector('.hao-account-pro-kicker');
+    const body = card.querySelector('.hao-account-pro-copy p');
+    const t = text();
+    if (kicker) kicker.textContent = t.trialActive;
+    if (body) body.textContent = t.trialBody.replace('{date}', formatDate(snapshot.subscription.current_period_end));
+  }
+
+  function enhance(snapshot = latestSnapshot) {
     const dialog = document.querySelector('#hao-account-overlay .hao-account-dialog');
     if (!dialog) return;
     buildPlanPanel(dialog);
     buildGuestGuide(dialog);
     enhanceSignedInCard(dialog);
+    enhanceTrialCard(dialog, snapshot);
   }
 
   function resumeIntent(snapshot) {
@@ -172,20 +198,21 @@
     sessionStorage.removeItem(intentKey);
     window.HaoAccount?.open?.();
     window.setTimeout(() => {
-      enhance();
+      enhance(snapshot);
       const checkout = document.querySelector('#hao-account-overlay .hao-account-pro-card:not(.is-active) .hao-account-primary');
       checkout?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       window.setTimeout(() => checkout?.focus(), 220);
     }, 0);
   }
 
-  const observer = new MutationObserver(enhance);
+  const observer = new MutationObserver(() => enhance(latestSnapshot));
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   window.addEventListener('hao:account-changed', (event) => {
-    enhance();
-    resumeIntent(event.detail);
+    latestSnapshot = event.detail || null;
+    enhance(latestSnapshot);
+    resumeIntent(latestSnapshot);
   });
 
-  enhance();
+  enhance(latestSnapshot);
 })();
