@@ -5,9 +5,9 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:4173",
   "http://localhost:8000",
 ]);
-
 const ADMIN_URL = "https://liuh886.github.io/admin/";
 const MAX_DURATION_DAYS = 730;
+const MANAGEABLE_STATUSES = ["active", "trialing", "past_due", "unpaid"];
 
 function namedEnv(name: string, legacyName: string): string {
   const raw = Deno.env.get(name);
@@ -31,14 +31,18 @@ function corsHeaders(req: Request): Record<string, string> {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Headers": "authorization, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Vary": "Origin",
+    Vary: "Origin",
   };
 }
 
 function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders(req), "Content-Type": "application/json", "Cache-Control": "private, no-store" },
+    headers: {
+      ...corsHeaders(req),
+      "Content-Type": "application/json",
+      "Cache-Control": "private, no-store",
+    },
   });
 }
 
@@ -58,7 +62,7 @@ async function sha256Hex(value: string): Promise<string> {
 function durationDays(value: unknown): number {
   const days = Math.trunc(Number(value));
   if (!Number.isFinite(days) || days < 1 || days > MAX_DURATION_DAYS) {
-    throw new Error(`Complimentary duration must be between 1 and ${MAX_DURATION_DAYS} days.`);
+    throw new Error(`Free trial duration must be between 1 and ${MAX_DURATION_DAYS} days.`);
   }
   return days;
 }
@@ -70,12 +74,53 @@ function productCodes(value: unknown): string[] {
   return codes;
 }
 
+function idOf(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "id" in value) {
+    return String((value as { id: unknown }).id ?? "");
+  }
+  return "";
+}
+
+function isoFromUnix(value: unknown): string | null {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0
+    ? new Date(seconds * 1000).toISOString()
+    : null;
+}
+
+async function stripePost(
+  path: string,
+  params: URLSearchParams,
+  idempotencyKey?: string,
+): Promise<Record<string, any>> {
+  const key = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured.");
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  const response = await fetch(`https://api.stripe.com/v1/${path}`, {
+    method: "POST",
+    headers,
+    body: params,
+  });
+  const payload = await response.json() as Record<string, any>;
+  if (!response.ok) {
+    throw new Error(payload.error?.message ?? `Stripe request failed (${response.status}).`);
+  }
+  return payload;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json(req, { error: "Method not allowed." }, 405);
 
   const origin = req.headers.get("origin") ?? "";
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return json(req, { error: "Origin is not allowed." }, 403);
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+    return json(req, { error: "Origin is not allowed." }, 403);
+  }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const publishableKey = namedEnv("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY");
@@ -105,10 +150,9 @@ Deno.serve(async (req: Request) => {
   } catch {
     return json(req, { error: "Invalid JSON payload." }, 400);
   }
-
   const action = String(body.action ?? "catalog");
 
-  const adminRole = async (): Promise<string | null> => {
+  async function adminRole(): Promise<string | null> {
     const { data, error } = await admin
       .from("membership_admins")
       .select("role,active")
@@ -116,30 +160,129 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (error || !data?.active) return null;
     return String(data.role);
-  };
+  }
+
+  async function ensureCustomer(): Promise<string> {
+    const { data: existing, error: readError } = await admin
+      .from("billing_customers")
+      .select("customer_id")
+      .eq("user_id", actor.id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (existing?.customer_id) return String(existing.customer_id);
+
+    const params = new URLSearchParams();
+    if (actor.email) params.set("email", actor.email);
+    params.set("description", `Hao Apps member ${actor.id}`);
+    params.set("metadata[supabase_user_id]", actor.id);
+    const customer = await stripePost("customers", params, `hao-customer-${actor.id}`);
+    const customerId = String(customer.id ?? "");
+    if (!customerId) throw new Error("Stripe customer was not created.");
+
+    const { error: writeError } = await admin.from("billing_customers").upsert({
+      user_id: actor.id,
+      provider: "stripe",
+      customer_id: customerId,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    if (writeError) throw writeError;
+    return customerId;
+  }
+
+  async function syncCreatedSubscription(
+    subscription: Record<string, any>,
+    productCode: string,
+    priceId: string,
+    entitlementCodes: string[],
+    inviteId: string,
+  ): Promise<void> {
+    const subscriptionId = String(subscription.id ?? "");
+    const customerId = idOf(subscription.customer);
+    if (!subscriptionId || !customerId) {
+      throw new Error("Stripe subscription identifiers are incomplete.");
+    }
+
+    const status = String(subscription.status ?? "trialing");
+    const periodEnd = isoFromUnix(subscription.trial_end ?? subscription.current_period_end);
+    const price = subscription.items?.data?.[0]?.price ?? {};
+    const stripeProductId = idOf(price.product);
+
+    const { error: subscriptionError } = await admin.from("subscriptions").upsert({
+      id: subscriptionId,
+      user_id: actor.id,
+      provider: "stripe",
+      product_code: productCode,
+      customer_id: customerId,
+      price_id: priceId,
+      status,
+      current_period_end: periodEnd,
+      cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+      metadata: subscription.metadata ?? {},
+      livemode: Boolean(subscription.livemode),
+      stripe_product_id: stripeProductId || null,
+      ended_at: null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "id" });
+    if (subscriptionError) throw subscriptionError;
+
+    const { error: deleteError } = await admin
+      .from("entitlement_grants")
+      .delete()
+      .eq("user_id", actor.id)
+      .eq("source", "stripe_subscription")
+      .eq("source_ref", subscriptionId);
+    if (deleteError) throw deleteError;
+
+    const grants = entitlementCodes.map((entitlementCode) => ({
+      user_id: actor.id,
+      entitlement_code: entitlementCode,
+      source: "stripe_subscription",
+      source_ref: subscriptionId,
+      active: ["active", "trialing", "past_due"].includes(status),
+      valid_until: periodEnd,
+      metadata: {
+        product_code: productCode,
+        price_id: priceId,
+        status,
+        trial_source: "membership_invite",
+        membership_invite_id: inviteId,
+      },
+      updated_at: new Date().toISOString(),
+    }));
+    const { error: grantError } = await admin.from("entitlement_grants").insert(grants);
+    if (grantError) throw grantError;
+  }
 
   try {
     if (action === "catalog") {
       const role = await adminRole();
       if (!role) return json(req, { error: "Administrator access is required." }, 403);
 
-      const [{ data: products, error: productError }, { data: mappings, error: mappingError }, { data: invites, error: inviteError }] = await Promise.all([
-        admin.from("billing_products").select("product_code,name,app_url,active").eq("active", true).order("name"),
-        admin.from("billing_product_entitlements").select("product_code,entitlement_code").like("entitlement_code", "%.pro").order("product_code"),
-        admin.from("membership_invites").select("id,product_codes,duration_days,created_at,redeemed_at").order("created_at", { ascending: false }).limit(20),
+      const [productsResult, mappingsResult, invitesResult] = await Promise.all([
+        admin.from("billing_products")
+          .select("product_code,name,app_url,active")
+          .eq("active", true)
+          .order("name"),
+        admin.from("billing_product_entitlements")
+          .select("product_code,entitlement_code")
+          .like("entitlement_code", "%.pro")
+          .order("product_code"),
+        admin.from("membership_invites")
+          .select("id,product_codes,duration_days,created_at,redeemed_by,redeemed_at")
+          .order("created_at", { ascending: false })
+          .limit(20),
       ]);
-      if (productError) throw productError;
-      if (mappingError) throw mappingError;
-      if (inviteError) throw inviteError;
+      if (productsResult.error) throw productsResult.error;
+      if (mappingsResult.error) throw mappingsResult.error;
+      if (invitesResult.error) throw invitesResult.error;
 
-      const mappedCodes = new Set((mappings ?? []).map((item) => String(item.product_code)));
-      const inviteProducts = (products ?? []).filter((product) => mappedCodes.has(String(product.product_code)));
-
+      const mappedCodes = new Set((mappingsResult.data ?? []).map((row) => String(row.product_code)));
+      const products = (productsResult.data ?? []).filter((product) => mappedCodes.has(String(product.product_code)));
       return json(req, {
         actor: { id: actor.id, email: actor.email, role },
         can_create: ["owner", "operator"].includes(role),
-        products: inviteProducts,
-        recent_invites: invites ?? [],
+        products,
+        recent_invites: invitesResult.data ?? [],
       });
     }
 
@@ -151,20 +294,24 @@ Deno.serve(async (req: Request) => {
 
       const selectedCodes = productCodes(body.product_codes);
       const days = durationDays(body.duration_days);
-
-      const [{ data: products, error: productError }, { data: mappings, error: mappingError }] = await Promise.all([
-        admin.from("billing_products").select("product_code,name,app_url,active").in("product_code", selectedCodes).eq("active", true),
-        admin.from("billing_product_entitlements").select("product_code,entitlement_code").in("product_code", selectedCodes).like("entitlement_code", "%.pro"),
+      const [productsResult, mappingsResult] = await Promise.all([
+        admin.from("billing_products")
+          .select("product_code,name,app_url,active")
+          .in("product_code", selectedCodes)
+          .eq("active", true),
+        admin.from("billing_product_entitlements")
+          .select("product_code,entitlement_code")
+          .in("product_code", selectedCodes)
+          .like("entitlement_code", "%.pro"),
       ]);
-      if (productError) throw productError;
-      if (mappingError) throw mappingError;
+      if (productsResult.error) throw productsResult.error;
+      if (mappingsResult.error) throw mappingsResult.error;
 
-      const productByCode = new Map((products ?? []).map((item) => [String(item.product_code), item]));
-      const mappedCodes = new Set((mappings ?? []).map((item) => String(item.product_code)));
+      const productByCode = new Map((productsResult.data ?? []).map((row) => [String(row.product_code), row]));
+      const mappedCodes = new Set((mappingsResult.data ?? []).map((row) => String(row.product_code)));
       const missing = selectedCodes.filter((code) => !productByCode.has(code) || !mappedCodes.has(code));
       if (missing.length) throw new Error(`Unavailable Pro product: ${missing.join(", ")}`);
 
-      const orderedProducts = selectedCodes.map((code) => productByCode.get(code));
       const rawToken = randomToken();
       const tokenHash = await sha256Hex(rawToken);
       const { data: invite, error: insertError } = await admin
@@ -182,7 +329,7 @@ Deno.serve(async (req: Request) => {
       const { error: auditError } = await admin.from("membership_admin_actions").insert({
         actor_user_id: actor.id,
         action_type: "create_invite",
-        reason: "Single-use multi-product complimentary invite",
+        reason: "Single-use multi-product Stripe free trial invite",
         status: "completed",
         request_payload: { duration_days: days, product_codes: selectedCodes },
         result_payload: { invite_id: invite.id },
@@ -193,7 +340,7 @@ Deno.serve(async (req: Request) => {
         ok: true,
         invite_id: invite.id,
         created_at: invite.created_at,
-        products: orderedProducts,
+        products: selectedCodes.map((code) => productByCode.get(code)),
         duration_days: days,
         invite_url: `${ADMIN_URL}#invite=${encodeURIComponent(rawToken)}`,
       });
@@ -203,29 +350,172 @@ Deno.serve(async (req: Request) => {
       const rawToken = String(body.token ?? "").trim().toLowerCase();
       if (!/^[a-f0-9]{64}$/.test(rawToken)) throw new Error("Invitation link is invalid.");
       const tokenHash = await sha256Hex(rawToken);
-      const { data, error } = await admin.rpc("redeem_membership_invite", {
-        p_token_hash: tokenHash,
+
+      const { data: invite, error: inviteError } = await admin
+        .from("membership_invites")
+        .select("id,product_codes,duration_days,created_by,redeemed_by,redeemed_at")
+        .eq("token_hash", tokenHash)
+        .maybeSingle();
+      if (inviteError || !invite) throw new Error("Invitation link is invalid.");
+      if (invite.redeemed_at) throw new Error("Invitation link has already been used.");
+      if (invite.redeemed_by && invite.redeemed_by !== actor.id) {
+        throw new Error("Invitation link has already been claimed.");
+      }
+
+      if (!invite.redeemed_by) {
+        const { data: claimed, error: claimError } = await admin
+          .from("membership_invites")
+          .update({ redeemed_by: actor.id })
+          .eq("id", invite.id)
+          .is("redeemed_by", null)
+          .is("redeemed_at", null)
+          .select("id")
+          .maybeSingle();
+        if (claimError) throw claimError;
+        if (!claimed) throw new Error("Invitation link has already been claimed.");
+      }
+
+      const selectedCodes = productCodes(invite.product_codes);
+      const days = durationDays(invite.duration_days);
+      const [productsResult, pricesResult, mappingsResult, subscriptionsResult] = await Promise.all([
+        admin.from("billing_products")
+          .select("product_code,name,app_url,active")
+          .in("product_code", selectedCodes)
+          .eq("active", true),
+        admin.from("billing_prices")
+          .select("product_code,price_id")
+          .in("product_code", selectedCodes)
+          .eq("active", true)
+          .eq("is_default", true),
+        admin.from("billing_product_entitlements")
+          .select("product_code,entitlement_code")
+          .in("product_code", selectedCodes)
+          .like("entitlement_code", "%.pro"),
+        admin.from("subscriptions")
+          .select("id,product_code,status,current_period_end")
+          .eq("user_id", actor.id)
+          .in("product_code", selectedCodes)
+          .in("status", MANAGEABLE_STATUSES),
+      ]);
+      if (productsResult.error) throw productsResult.error;
+      if (pricesResult.error) throw pricesResult.error;
+      if (mappingsResult.error) throw mappingsResult.error;
+      if (subscriptionsResult.error) throw subscriptionsResult.error;
+
+      const productByCode = new Map((productsResult.data ?? []).map((row) => [String(row.product_code), row]));
+      const priceByCode = new Map((pricesResult.data ?? []).map((row) => [String(row.product_code), String(row.price_id)]));
+      const entitlementsByCode = new Map<string, string[]>();
+      for (const row of mappingsResult.data ?? []) {
+        const code = String(row.product_code);
+        const values = entitlementsByCode.get(code) ?? [];
+        values.push(String(row.entitlement_code));
+        entitlementsByCode.set(code, values);
+      }
+      for (const code of selectedCodes) {
+        if (!productByCode.has(code) || !priceByCode.has(code) || !(entitlementsByCode.get(code)?.length)) {
+          throw new Error(`Invitation product ${code} is not fully configured for billing.`);
+        }
+      }
+
+      const customerId = await ensureCustomer();
+      const existingByProduct = new Map(
+        (subscriptionsResult.data ?? []).map((row) => [String(row.product_code), row]),
+      );
+      const results: Record<string, unknown>[] = [];
+
+      for (const code of selectedCodes) {
+        const product = productByCode.get(code)!;
+        const existing = existingByProduct.get(code);
+        if (existing) {
+          results.push({
+            product_code: code,
+            name: product.name,
+            app_url: product.app_url,
+            subscription_id: existing.id,
+            subscription_status: existing.status,
+            trial_end: existing.current_period_end,
+            already_subscribed: true,
+          });
+          continue;
+        }
+
+        const priceId = priceByCode.get(code)!;
+        const params = new URLSearchParams();
+        params.set("customer", customerId);
+        params.set("items[0][price]", priceId);
+        params.set("trial_period_days", String(days));
+        params.set("trial_settings[end_behavior][missing_payment_method]", "cancel");
+        params.set("metadata[supabase_user_id]", actor.id);
+        params.set("metadata[product_code]", code);
+        params.set("metadata[membership_invite_id]", invite.id);
+        params.set("metadata[trial_source]", "membership_invite");
+        params.set("metadata[trial_duration_days]", String(days));
+
+        const subscription = await stripePost(
+          "subscriptions",
+          params,
+          `membership-invite-${invite.id}-${code}`,
+        );
+        await syncCreatedSubscription(
+          subscription,
+          code,
+          priceId,
+          entitlementsByCode.get(code)!,
+          invite.id,
+        );
+        results.push({
+          product_code: code,
+          name: product.name,
+          app_url: product.app_url,
+          subscription_id: subscription.id,
+          subscription_status: subscription.status,
+          trial_end: isoFromUnix(subscription.trial_end ?? subscription.current_period_end),
+          already_subscribed: false,
+        });
+      }
+
+      const { error: refreshError } = await admin.rpc("refresh_effective_entitlements", {
         p_user_id: actor.id,
       });
-      if (error) throw error;
+      if (refreshError) throw refreshError;
 
-      const redemption = typeof data === "string" ? JSON.parse(data) : data;
-      const productCodeList = Array.isArray(redemption?.product_codes) ? redemption.product_codes : [];
+      const { error: finishError } = await admin
+        .from("membership_invites")
+        .update({ redeemed_at: new Date().toISOString() })
+        .eq("id", invite.id)
+        .eq("redeemed_by", actor.id)
+        .is("redeemed_at", null);
+      if (finishError) throw finishError;
+
       const { error: auditError } = await admin.from("membership_admin_actions").insert({
         actor_user_id: actor.id,
-        action_type: "redeem_invite",
+        action_type: "redeem_invite_trial",
         target_user_id: actor.id,
         target_email: actor.email ?? null,
-        reason: "Multi-product complimentary invite redeemed",
+        reason: "Multi-product Stripe free trial activated",
         status: "completed",
-        request_payload: { invite_id: redemption?.invite_id ?? null },
-        result_payload: { product_codes: productCodeList, valid_until: redemption?.valid_until ?? null },
+        request_payload: {
+          invite_id: invite.id,
+          product_codes: selectedCodes,
+          duration_days: days,
+        },
+        result_payload: {
+          subscriptions: results.map((item) => ({
+            product_code: item.product_code,
+            subscription_id: item.subscription_id,
+            status: item.subscription_status,
+          })),
+        },
       });
       if (auditError) console.error("membership invite redemption audit write failed", auditError);
 
       return json(req, {
         ok: true,
-        redemption,
+        redemption: {
+          invite_id: invite.id,
+          duration_days: days,
+          products: results,
+        },
         user: { id: actor.id, email: actor.email },
       });
     }
