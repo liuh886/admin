@@ -1,14 +1,15 @@
 # Single-use Pro invitations
 
-The admin console can create one-time complimentary Pro invitation links for an existing Hao Apps product.
+The admin console can create one-time complimentary Pro invitation links that bundle one or more Hao Apps products.
 
 ## Admin flow
 
 1. Open `https://liuh886.github.io/admin/` as an `owner` or `operator`.
-2. In **一次性邀请**, select the product.
-3. Select one or more entitlements mapped to that product.
-4. Select the complimentary duration: 7, 30, 90, 365 days, or lifetime.
-5. Generate the invitation and copy the link immediately.
+2. In **一次性 Pro 产品包邀请**, select one or more Pro products.
+3. Select one complimentary duration for the whole bundle.
+4. Generate the invitation and copy the link immediately.
+
+The product is the configuration unit. Admin users do not choose low-level entitlement codes. Each selected product resolves its existing `*.pro` mapping from `billing_product_entitlements` when the invitation is created and redeemed.
 
 The original token is returned only when the invitation is created. The recent-invites list intentionally shows status but cannot reconstruct the link.
 
@@ -20,15 +21,26 @@ The invitation URL uses a fragment:
 https://liuh886.github.io/admin/#invite=<token>
 ```
 
-The browser stores the token locally, removes it from the address bar, and uses the existing Supabase OAuth flow. After sign-in, the first authenticated account to redeem the token receives the selected entitlement grants. The complimentary duration starts at redemption time.
+The browser stores the token locally, removes it from the address bar, and uses the existing Supabase OAuth flow. After sign-in, the first authenticated account to redeem the token receives Pro grants for every product in the invitation. The complimentary duration starts at redemption time and is shared by the whole bundle.
 
-On success, the page shows the product name, entitlement validity and the canonical `billing_products.app_url`, with a direct button to open the product.
+On success, the page lists every granted product with its canonical `billing_products.app_url` so the recipient can open each product directly.
+
+## Membership behavior
+
+Invitation access is a complimentary grant, not a Stripe subscription. It does not create a Checkout Session, collect a payment method, auto-renew, or charge after expiry.
+
+The grant reuses the existing membership foundation:
+
+- selected products are stored as `membership_invites.product_codes[]`;
+- each product resolves its current `*.pro` entitlement mapping;
+- grants are written to `entitlement_grants` with `source = 'invite'`;
+- `refresh_effective_entitlements` recalculates effective access immediately.
+
+Existing Stripe subscriptions and other grants remain independent and can overlap with invitation access.
 
 ## One-time guarantee
 
-`membership_invites.token_hash` stores only a SHA-256 hash of a 256-bit random token. Redemption is executed by `redeem_membership_invite` inside PostgreSQL and locks the invitation row with `FOR UPDATE` before checking `redeemed_at`. The same link therefore cannot successfully create two grants under concurrent redemption.
-
-The redeemed access is not a separate membership system. It is written to the existing `entitlement_grants` table with `source = 'invite'`, then `refresh_effective_entitlements` recalculates the user's effective Pro access.
+`membership_invites.token_hash` stores only a SHA-256 hash of a 256-bit random token. Redemption is executed by `redeem_membership_invite` inside PostgreSQL and locks the invitation row with `FOR UPDATE` before checking `redeemed_at`. The same link therefore cannot successfully grant two accounts under concurrent redemption.
 
 ## Security boundary
 
