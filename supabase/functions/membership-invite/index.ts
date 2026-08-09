@@ -7,6 +7,7 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 const ADMIN_URL = "https://liuh886.github.io/admin/";
+const MAX_DURATION_DAYS = 3650;
 
 function namedEnv(name: string, legacyName: string): string {
   const raw = Deno.env.get(name);
@@ -54,19 +55,18 @@ async function sha256Hex(value: string): Promise<string> {
     .join("");
 }
 
-function durationDays(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
+function durationDays(value: unknown): number {
   const days = Math.trunc(Number(value));
-  if (!Number.isFinite(days) || days < 1 || days > 3650) {
-    throw new Error("Duration must be between 1 and 3650 days, or lifetime.");
+  if (!Number.isFinite(days) || days < 1 || days > MAX_DURATION_DAYS) {
+    throw new Error(`Complimentary duration must be between 1 and ${MAX_DURATION_DAYS} days.`);
   }
   return days;
 }
 
-function entitlementList(value: unknown): string[] {
-  if (!Array.isArray(value)) throw new Error("At least one entitlement is required.");
+function productCodes(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new Error("At least one Pro product is required.");
   const codes = [...new Set(value.map((item) => String(item ?? "").trim()).filter(Boolean))];
-  if (!codes.length) throw new Error("At least one entitlement is required.");
+  if (!codes.length) throw new Error("At least one Pro product is required.");
   return codes;
 }
 
@@ -125,18 +125,20 @@ Deno.serve(async (req: Request) => {
 
       const [{ data: products, error: productError }, { data: mappings, error: mappingError }, { data: invites, error: inviteError }] = await Promise.all([
         admin.from("billing_products").select("product_code,name,app_url,active").eq("active", true).order("name"),
-        admin.from("billing_product_entitlements").select("product_code,entitlement_code").order("product_code").order("entitlement_code"),
-        admin.from("membership_invites").select("id,product_code,entitlement_codes,duration_days,created_at,redeemed_at").order("created_at", { ascending: false }).limit(20),
+        admin.from("billing_product_entitlements").select("product_code,entitlement_code").like("entitlement_code", "%.pro").order("product_code"),
+        admin.from("membership_invites").select("id,product_codes,duration_days,created_at,redeemed_at").order("created_at", { ascending: false }).limit(20),
       ]);
       if (productError) throw productError;
       if (mappingError) throw mappingError;
       if (inviteError) throw inviteError;
 
+      const mappedCodes = new Set((mappings ?? []).map((item) => String(item.product_code)));
+      const inviteProducts = (products ?? []).filter((product) => mappedCodes.has(String(product.product_code)));
+
       return json(req, {
         actor: { id: actor.id, email: actor.email, role },
         can_create: ["owner", "operator"].includes(role),
-        products: products ?? [],
-        mappings: mappings ?? [],
+        products: inviteProducts,
         recent_invites: invites ?? [],
       });
     }
@@ -147,30 +149,29 @@ Deno.serve(async (req: Request) => {
         return json(req, { error: "This action requires operator access." }, 403);
       }
 
-      const productCode = String(body.product_code ?? "").trim();
-      const selectedEntitlements = entitlementList(body.entitlement_codes);
+      const selectedCodes = productCodes(body.product_codes);
       const days = durationDays(body.duration_days);
 
-      const [{ data: product, error: productError }, { data: mappings, error: mappingError }] = await Promise.all([
-        admin.from("billing_products").select("product_code,name,app_url,active").eq("product_code", productCode).eq("active", true).maybeSingle(),
-        admin.from("billing_product_entitlements").select("entitlement_code").eq("product_code", productCode),
+      const [{ data: products, error: productError }, { data: mappings, error: mappingError }] = await Promise.all([
+        admin.from("billing_products").select("product_code,name,app_url,active").in("product_code", selectedCodes).eq("active", true),
+        admin.from("billing_product_entitlements").select("product_code,entitlement_code").in("product_code", selectedCodes).like("entitlement_code", "%.pro"),
       ]);
-      if (productError || !product) throw new Error("Product is unavailable.");
+      if (productError) throw productError;
       if (mappingError) throw mappingError;
 
-      const allowed = new Set((mappings ?? []).map((item) => String(item.entitlement_code)));
-      if (!selectedEntitlements.every((code) => allowed.has(code))) {
-        throw new Error("One or more entitlements are not mapped to this product.");
-      }
+      const productByCode = new Map((products ?? []).map((item) => [String(item.product_code), item]));
+      const mappedCodes = new Set((mappings ?? []).map((item) => String(item.product_code)));
+      const missing = selectedCodes.filter((code) => !productByCode.has(code) || !mappedCodes.has(code));
+      if (missing.length) throw new Error(`Unavailable Pro product: ${missing.join(", ")}`);
 
+      const orderedProducts = selectedCodes.map((code) => productByCode.get(code));
       const rawToken = randomToken();
       const tokenHash = await sha256Hex(rawToken);
       const { data: invite, error: insertError } = await admin
         .from("membership_invites")
         .insert({
           token_hash: tokenHash,
-          product_code: productCode,
-          entitlement_codes: selectedEntitlements,
+          product_codes: selectedCodes,
           duration_days: days,
           created_by: actor.id,
         })
@@ -181,10 +182,9 @@ Deno.serve(async (req: Request) => {
       const { error: auditError } = await admin.from("membership_admin_actions").insert({
         actor_user_id: actor.id,
         action_type: "create_invite",
-        product_code: productCode,
-        reason: "Single-use complimentary invite",
+        reason: "Single-use multi-product complimentary invite",
         status: "completed",
-        request_payload: { duration_days: days, entitlement_codes: selectedEntitlements },
+        request_payload: { duration_days: days, product_codes: selectedCodes },
         result_payload: { invite_id: invite.id },
       });
       if (auditError) console.error("membership invite audit write failed", auditError);
@@ -193,8 +193,7 @@ Deno.serve(async (req: Request) => {
         ok: true,
         invite_id: invite.id,
         created_at: invite.created_at,
-        product,
-        entitlement_codes: selectedEntitlements,
+        products: orderedProducts,
         duration_days: days,
         invite_url: `${ADMIN_URL}#invite=${encodeURIComponent(rawToken)}`,
       });
@@ -209,7 +208,26 @@ Deno.serve(async (req: Request) => {
         p_user_id: actor.id,
       });
       if (error) throw error;
-      return json(req, { ok: true, redemption: data, user: { id: actor.id, email: actor.email } });
+
+      const redemption = typeof data === "string" ? JSON.parse(data) : data;
+      const productCodeList = Array.isArray(redemption?.product_codes) ? redemption.product_codes : [];
+      const { error: auditError } = await admin.from("membership_admin_actions").insert({
+        actor_user_id: actor.id,
+        action_type: "redeem_invite",
+        target_user_id: actor.id,
+        target_email: actor.email ?? null,
+        reason: "Multi-product complimentary invite redeemed",
+        status: "completed",
+        request_payload: { invite_id: redemption?.invite_id ?? null },
+        result_payload: { product_codes: productCodeList, valid_until: redemption?.valid_until ?? null },
+      });
+      if (auditError) console.error("membership invite redemption audit write failed", auditError);
+
+      return json(req, {
+        ok: true,
+        redemption,
+        user: { id: actor.id, email: actor.email },
+      });
     }
 
     return json(req, { error: "Unknown action." }, 400);
