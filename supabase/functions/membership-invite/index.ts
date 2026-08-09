@@ -187,7 +187,7 @@ Deno.serve(async (req: Request) => {
         request_payload: { duration_days: days, entitlement_codes: selectedEntitlements },
         result_payload: { invite_id: invite.id },
       });
-      if (auditError) throw auditError;
+      if (auditError) console.error("membership invite audit write failed", auditError);
 
       return json(req, {
         ok: true,
