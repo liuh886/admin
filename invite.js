@@ -1,4 +1,4 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/+esm';
 
 const SUPABASE_URL = 'https://blgwlycfcwvsupmqyqwn.supabase.co';
 const PUBLISHABLE_KEY = 'sb_publishable_n1Va-c_alpkQ0zNuJYUaxA_J0u68RVW';
@@ -61,6 +61,11 @@ function readInviteToken() {
 const inviteToken = readInviteToken();
 const inviteMode = Boolean(inviteToken);
 window.__HAO_INVITE_MODE__ = inviteMode;
+
+function leaveInviteMode() {
+  localStorage.removeItem(STORAGE_KEY);
+  window.location.assign(ADMIN_URL);
+}
 
 function inviteShell() {
   let root = document.querySelector('#invite-redemption');
@@ -142,8 +147,10 @@ async function redeemInvite(session) {
         <p class="eyebrow">HAO APPS · PRO INVITATION</p>
         <h1>这份邀请无法领取</h1>
         <p class="invite-status" data-kind="error">${escapeHtml(error.message)}</p>
+        <button id="invite-leave" class="button ghost" type="button">返回 Hao Apps</button>
         <p class="invite-footnote">一次性邀请被领取后不能再次使用。</p>
       </div>`;
+    root.querySelector('#invite-leave')?.addEventListener('click', leaveInviteMode);
   } finally {
     redeeming = false;
   }
