@@ -15,15 +15,27 @@ The raw invitation token is returned only once. PostgreSQL stores only its SHA-2
 
 ## Recipient flow
 
-The invitation URL uses a fragment:
+The share URL keeps both the secret token and a non-authoritative offer preview in the URL fragment:
 
 ```text
-https://liuh886.github.io/admin/#invite=<token>
+https://liuh886.github.io/admin/#invite=<token>&offer=<encoded-preview>
 ```
 
-The browser stores the token locally, removes it from the address bar, and uses the existing Supabase OAuth flow. After sign-in, the first account to claim the invitation receives a real Stripe `trialing` subscription for each invited product that does not already have a manageable subscription.
+The preview contains only the invited product names, canonical app URLs and free-trial duration. It has no authorization authority: redemption still resolves the real invitation from the hashed token on the server.
+
+When a recipient opens the link, the invitation page shows the promised products and access URLs before sign-in. The recipient can then choose one of three Supabase OAuth entry points:
+
+- Google — recommended;
+- GitHub;
+- X.
+
+The invitation token and preview are stored locally before OAuth redirect and removed from the address bar. After sign-in, the page shows the current Hao Apps account and requires an explicit confirmation before consuming the one-time invitation. The recipient can switch accounts before confirming.
+
+After confirmation, the first account to claim the invitation receives a real Stripe `trialing` subscription for each invited product that does not already have a manageable subscription.
 
 On success, the page lists each product, its trial end date, and the canonical `billing_products.app_url`.
+
+Supabase Auth automatically links OAuth identities that use the same verified email address, so existing users should use the same Hao Apps identity they already use elsewhere.
 
 ## Membership behavior
 
@@ -65,6 +77,7 @@ The first authenticated account atomically claims the invitation. The same accou
 
 - Raw invitation tokens are never stored in PostgreSQL or audit logs.
 - Browser roles cannot read or mutate `membership_invites` directly.
-- Invitation creation requires an active `owner` or `operator` row in `membership_admins`.
+- The offer preview in the fragment is display-only and cannot change the server-side invitation contents.
+- Invitation creation requires an active `owner` or `operator` row in `membership_admins` and AAL2.
 - Redemption requires a valid Supabase user JWT but no admin role.
 - Stripe and service-role secrets stay inside the `membership-invite` Edge Function.
