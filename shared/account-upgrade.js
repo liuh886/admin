@@ -23,11 +23,11 @@
       stripe: 'Stripe 安全结账 · 可随时取消',
       checkout: '开通 {app} Pro',
       manage: '管理订阅',
-      proManageBody: 'Pro 权限已激活。订阅、付款方式与取消操作可从下方统一管理。',
+      proManageBody: 'Pro 权限已激活，当前没有需要续费或取消的付费订阅。',
       portalOpening: '正在前往 Stripe…',
       portalUnavailable: '暂时无法打开订阅管理。Pro 权益不受影响。',
       trialActive: 'PRO · 免费体验中',
-      trialBody: '免费体验有效至 {date}。这是一个可管理的 Stripe 订阅，你可以随时查看订阅、管理付款方式或取消。',
+      trialBody: '免费体验有效至 {date}。这是一条可管理的 Stripe 订阅，你可以随时查看订阅、管理付款方式或取消。',
     },
     en: {
       plans: 'Free and Pro',
@@ -43,7 +43,7 @@
       stripe: 'Secure checkout with Stripe · Cancel anytime',
       checkout: 'Upgrade to {app} Pro',
       manage: 'Manage subscription',
-      proManageBody: 'Pro access is active. Manage subscription, payment, and cancellation settings below.',
+      proManageBody: 'Pro access is active and no paid subscription currently needs renewal or cancellation.',
       portalOpening: 'Opening Stripe…',
       portalUnavailable: 'Subscription management is temporarily unavailable. Your Pro access is unaffected.',
       trialActive: 'PRO · FREE TRIAL',
@@ -238,7 +238,7 @@
   }
 
   function ensureProManagement(dialog, snapshot) {
-    if (!snapshot?.isPro) return;
+    if (!snapshot?.isPro || !snapshot.subscription) return;
     const card = dialog.querySelector('.hao-account-pro-card.is-active');
     const action = card?.querySelector('.hao-account-pro-action');
     if (!card || !action || action.querySelector('button')) return;
