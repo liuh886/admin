@@ -41,6 +41,10 @@ expect(browser.includes('product.app_url'), 'Successful redemption must show eve
 expect(browser.includes('管理订阅'), 'Invitation UX must explain subscription management during the free period');
 expect(browser.includes("callInvite('create'"), 'Admin UI must create invitations through the protected Edge Function');
 expect(browser.includes("callInvite('redeem'"), 'Recipient UI must redeem invitations through the protected Edge Function');
+expect(browser.includes('链接已失效') && browser.includes('item.redeemed_email'), 'Recent invitations must show the claimant email and consumed-link state');
+expect(browser.includes('最终会员有效期会按所有授权来源聚合'), 'Admin must explain why another permanent grant can outlive an invite trial');
+expect(edge.includes('admin.auth.admin.getUserById'), 'Admin invite catalog must resolve redeemed user IDs to emails server-side');
+expect(edge.includes('redeemed_email'), 'Admin invite catalog must return the redemption email');
 expect(css.includes('.invite-product-options') && css.includes('.invite-product-option'), 'Multi-product selection must have dedicated responsive styles');
 expect(css.includes('.invite-provider-grid') && css.includes('.invite-provider.recommended'), 'Invitation social-login choices must have dedicated styling');
 expect(css.includes('.invite-offer') && css.includes('.invite-offer-item'), 'Invitation benefits preview must have dedicated styling');
