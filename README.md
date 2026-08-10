@@ -25,6 +25,8 @@ Privileged mutations are enforced again inside the Supabase Edge Functions. `mem
 
 Stripe secrets, the Google Analytics service-account credential, and the Supabase service role remain inside server-side Edge Functions. Browser and membership/billing Edge Functions pin the Supabase JavaScript client to a tested exact release rather than a floating major version.
 
+Customer account surfaces currently expose the verified Google OAuth path plus Turnstile-protected email magic links. Product pages query only their own configured entitlement. Entitlement refreshes fail closed, while profile, product-account, and subscription-read failures are isolated so a valid login session is not discarded because an optional account read is unavailable.
+
 The console is intentionally excluded from search indexing and is not linked from public product navigation. Knowing the URL does not grant administrative access.
 
 ## Server functions
