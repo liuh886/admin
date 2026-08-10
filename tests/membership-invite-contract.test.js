@@ -42,7 +42,7 @@ expect(browser.includes('管理订阅'), 'Invitation UX must explain subscriptio
 expect(browser.includes("callInvite('create'"), 'Admin UI must create invitations through the protected Edge Function');
 expect(browser.includes("callInvite('redeem'"), 'Recipient UI must redeem invitations through the protected Edge Function');
 expect(browser.includes('链接已失效') && browser.includes('item.redeemed_email'), 'Recent invitations must show the claimant email and consumed-link state');
-expect(browser.includes('最终会员有效期会按所有授权来源聚合'), 'Admin must explain why another permanent grant can outlive an invite trial');
+expect(browser.includes('会员页最终有效期会按所有授权来源聚合'), 'Admin must explain why another permanent grant can outlive an invite trial');
 expect(edge.includes('admin.auth.admin.getUserById'), 'Admin invite catalog must resolve redeemed user IDs to emails server-side');
 expect(edge.includes('redeemed_email'), 'Admin invite catalog must return the redemption email');
 expect(css.includes('.invite-product-options') && css.includes('.invite-product-option'), 'Multi-product selection must have dedicated responsive styles');
