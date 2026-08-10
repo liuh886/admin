@@ -66,7 +66,7 @@ for (const required of [
   'function removeInternalCapabilities(dialog)',
   "dialog.querySelector('.hao-account-feature-panel')?.remove()",
   'function ensureProManagement(dialog, snapshot)',
-  'if (!snapshot?.isPro) return',
+  'if (!snapshot?.isPro || snapshot.subscription) return',
   "manage: '管理订阅'",
   "manage: 'Manage subscription'",
   'config.portalFunctionUrl',
