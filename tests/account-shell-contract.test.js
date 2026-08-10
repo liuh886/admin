@@ -32,10 +32,19 @@ for (const required of [
 }
 
 expect(script.includes("const SUPABASE_JS_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/+esm'"), 'Shared browser client must pin Supabase JS exactly');
-expect(script.includes("const OAUTH_PROVIDER = 'google'"), 'Shared account shell must expose only the verified Google OAuth provider');
-expect(!script.includes("github: 'Continue with GitHub'"), 'Unverified GitHub OAuth must not be rendered');
-expect(!script.includes("x: 'Continue with X'"), 'Unverified X OAuth must not be rendered');
-expect(script.includes('providerButton.dataset.oauthProvider = OAUTH_PROVIDER'), 'Google OAuth button must use the shared provider path');
+expect(script.includes("const OAUTH_PROVIDERS = new Set(['google', 'github', 'x'])"), 'Shared account shell must expose the verified Google, GitHub, and X OAuth providers');
+for (const required of [
+  "github: '使用 GitHub 登录'",
+  "x: '使用 X 登录'",
+  "github: 'Continue with GitHub'",
+  "x: 'Continue with X'",
+  "for (const provider of ['google', 'github', 'x'])",
+  'button.dataset.oauthProvider = provider',
+  'void signInWithProvider(provider)',
+  'if (!OAUTH_PROVIDERS.has(provider))',
+]) {
+  expect(script.includes(required), `Shared multi-provider OAuth contract is missing ${required}`);
+}
 expect(script.includes("flowType: 'pkce'"), 'Browser auth must use PKCE');
 expect(script.includes('persistSession: true'), 'Account sessions must persist on the shared origin');
 expect(script.includes('config.billingEnabled'), 'Paid actions must remain controlled by the product config');
@@ -119,4 +128,4 @@ for (const forbidden of [
   expect(!forbidden.test(browser), `Shared browser assets contain forbidden secret material: ${forbidden}`);
 }
 
-console.log('Shared account UI keeps auth resilient, entitlement reads product-scoped, billing lifecycle explicit, and secrets server-side.');
+console.log('Shared account UI keeps Google/GitHub/X OAuth, auth resilience, product-scoped entitlements, billing lifecycle, and secrets server-side.');
