@@ -7,7 +7,7 @@
   const SUPABASE_JS_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/+esm';
   const TURNSTILE_SITE_KEY = '0x4AAAAAAEKVMnWa2valozxW';
   const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-  const OAUTH_PROVIDER = 'google';
+  const OAUTH_PROVIDERS = new Set(['google', 'github', 'x']);
   const MANAGEABLE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid']);
 
   const state = {
@@ -44,7 +44,8 @@
   const words = {
     zh: {
       account: '账户', shared: 'Hao Apps 共享账户', free: 'Free', pro: 'Pro', optional: '可选登录',
-      google: '使用 Google 登录', or: '或', email: '邮箱地址', magic: '发送登录链接',
+      google: '使用 Google 登录', github: '使用 GitHub 登录', x: '使用 X 登录', or: '或',
+      email: '邮箱地址', magic: '发送登录链接',
       sent: '登录链接已发送，请检查邮箱。', close: '关闭', signOut: '退出登录', refresh: '刷新账户',
       save: '保存名称', displayName: '显示名称', signedIn: '已登录', loading: '正在加载…',
       unavailable: '账户服务暂时不可用，请稍后重试。',
@@ -66,7 +67,8 @@
     },
     en: {
       account: 'Account', shared: 'Shared Hao Apps account', free: 'Free', pro: 'Pro', optional: 'OPTIONAL SIGN-IN',
-      google: 'Continue with Google', or: 'OR', email: 'Email address', magic: 'Send sign-in link',
+      google: 'Continue with Google', github: 'Continue with GitHub', x: 'Continue with X', or: 'OR',
+      email: 'Email address', magic: 'Send sign-in link',
       sent: 'Sign-in link sent. Check your inbox.', close: 'Close', signOut: 'Sign out', refresh: 'Refresh account',
       save: 'Save name', displayName: 'Display name', signedIn: 'Signed in', loading: 'Loading…',
       unavailable: 'Account service is temporarily unavailable. Try again shortly.',
@@ -110,6 +112,8 @@
       crown: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 4.5 4L12 4l4.5 6L21 6l-2 12H5L3 6Z"/><path d="M5 21h14"/></svg>',
       close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>',
       google: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"/><path d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.61A10 10 0 0 0 12 22Z"/><path d="M6.39 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.12-1.32.31-1.93V7.46H3.04A10 10 0 0 0 2 12c0 1.61.39 3.13 1.04 4.54l3.35-2.61Z"/><path d="M12 5.94c1.47 0 2.79.5 3.83 1.49l2.87-2.87A9.64 9.64 0 0 0 12 2a10 10 0 0 0-8.96 5.46l3.35 2.61C7.18 7.7 9.39 5.94 12 5.94Z"/></svg>',
+      github: '<svg viewBox="0 0 24 24" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.55 9.55 0 0 1 12 7.01c.85 0 1.71.11 2.51.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.86v2.57c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>',
+      x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="M4.2 3h4.6l4.2 5.6L17.8 3h2l-5.9 7.1L21 21h-4.6l-4.7-6.3L6.2 21h-2l6.6-7.8L4.2 3Zm3.6 1.7H7.5l9.8 14.6h1.2L8.8 4.7Z"/></svg>',
       mail: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
       refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.4-2L20 9M4 15l2.5 2a7 7 0 0 0 11.4-2"/></svg>',
       logout: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg>',
@@ -352,7 +356,7 @@
   }
 
   async function signInWithProvider(provider) {
-    if (provider !== OAUTH_PROVIDER) throw new Error(`Unsupported OAuth provider: ${provider}`);
+    if (!OAUTH_PROVIDERS.has(provider)) throw new Error(`Unsupported OAuth provider: ${provider}`);
     state.loading = true;
     state.error = '';
     render();
@@ -703,14 +707,16 @@
       badge.textContent = t.optional;
       guest.appendChild(badge);
 
-      const providerButton = document.createElement('button');
-      providerButton.type = 'button';
-      providerButton.className = 'hao-account-provider';
-      providerButton.dataset.oauthProvider = OAUTH_PROVIDER;
-      providerButton.innerHTML = `${icon('google')}<span>${state.loading ? t.loading : t.google}</span>`;
-      providerButton.disabled = state.loading;
-      providerButton.addEventListener('click', () => void signInWithProvider(OAUTH_PROVIDER));
-      guest.appendChild(providerButton);
+      for (const provider of ['google', 'github', 'x']) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'hao-account-provider';
+        button.dataset.oauthProvider = provider;
+        button.innerHTML = `${icon(provider)}<span>${state.loading ? t.loading : t[provider]}</span>`;
+        button.disabled = state.loading;
+        button.addEventListener('click', () => void signInWithProvider(provider));
+        guest.appendChild(button);
+      }
 
       const divider = document.createElement('div');
       divider.className = 'hao-account-divider';
