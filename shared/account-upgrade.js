@@ -184,7 +184,7 @@
   }
 
   function enhanceProCard(dialog, snapshot) {
-    if (!snapshot?.isPro) return;
+    if (!snapshot?.isPro || snapshot.subscription) return;
     const card = dialog.querySelector('.hao-account-pro-card.is-active');
     if (!card) return;
     const body = card.querySelector('.hao-account-pro-copy p');
