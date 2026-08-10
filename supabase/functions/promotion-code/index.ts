@@ -5,6 +5,7 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:4173",
   "http://localhost:8000",
 ]);
+const STRIPE_API_VERSION = "2026-02-25.clover";
 const MAX_DURATION_MONTHS = 120;
 
 function namedEnv(name: string, legacyName: string): string {
@@ -49,13 +50,19 @@ function stripeKey(): string {
   return key;
 }
 
+function stripeHeaders(contentType = false): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${stripeKey()}`,
+    "Stripe-Version": STRIPE_API_VERSION,
+  };
+  if (contentType) headers["Content-Type"] = "application/x-www-form-urlencoded";
+  return headers;
+}
+
 async function stripePost(path: string, params: URLSearchParams): Promise<Record<string, any>> {
   const response = await fetch(`https://api.stripe.com/v1/${path}`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${stripeKey()}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers: stripeHeaders(true),
     body: params,
   });
   const payload = await response.json() as Record<string, any>;
@@ -66,7 +73,7 @@ async function stripePost(path: string, params: URLSearchParams): Promise<Record
 async function stripeGet(path: string, params = new URLSearchParams()): Promise<Record<string, any>> {
   const suffix = params.size ? `?${params.toString()}` : "";
   const response = await fetch(`https://api.stripe.com/v1/${path}${suffix}`, {
-    headers: { Authorization: `Bearer ${stripeKey()}` },
+    headers: stripeHeaders(),
   });
   const payload = await response.json() as Record<string, any>;
   if (!response.ok) throw new Error(payload.error?.message ?? `Stripe request failed (${response.status}).`);
@@ -76,7 +83,7 @@ async function stripeGet(path: string, params = new URLSearchParams()): Promise<
 async function stripeDeleteCoupon(couponId: string): Promise<void> {
   const response = await fetch(`https://api.stripe.com/v1/coupons/${encodeURIComponent(couponId)}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${stripeKey()}` },
+    headers: stripeHeaders(),
   });
   if (!response.ok) console.error("promotion coupon cleanup failed", couponId, response.status);
 }
