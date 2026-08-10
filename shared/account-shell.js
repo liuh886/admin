@@ -4,9 +4,10 @@
   const config = window.HaoAccountConfig || {};
   if (!config.enabled) return;
 
+  const SUPABASE_JS_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/+esm';
   const TURNSTILE_SITE_KEY = '0x4AAAAAAEKVMnWa2valozxW';
   const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-  const OAUTH_PROVIDERS = new Set(['google', 'github', 'x']);
+  const OAUTH_PROVIDER = 'google';
   const MANAGEABLE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid']);
 
   const state = {
@@ -43,10 +44,10 @@
   const words = {
     zh: {
       account: '账户', shared: 'Hao Apps 共享账户', free: 'Free', pro: 'Pro', optional: '可选登录',
-      google: '使用 Google 登录', github: '使用 GitHub 登录', x: '使用 X 登录', or: '或',
-      email: '邮箱地址', magic: '发送登录链接', sent: '登录链接已发送，请检查邮箱。',
-      close: '关闭账户', signOut: '退出登录', refresh: '刷新账户', save: '保存名称', displayName: '显示名称',
-      signedIn: '已登录', loading: '正在加载…', unavailable: '账户服务暂时不可用，请稍后重试。',
+      google: '使用 Google 登录', or: '或', email: '邮箱地址', magic: '发送登录链接',
+      sent: '登录链接已发送，请检查邮箱。', close: '关闭', signOut: '退出登录', refresh: '刷新账户',
+      save: '保存名称', displayName: '显示名称', signedIn: '已登录', loading: '正在加载…',
+      unavailable: '账户服务暂时不可用，请稍后重试。',
       billingUnavailable: '暂时无法打开 Stripe 付款或订阅管理页面。你的账户和现有权限不受影响。',
       future: '账户能力', billingOff: '付费功能尚未开放。当前公开功能保持可用。', manage: '管理订阅',
       feedback: '提交反馈', feedbackPrompt: '告诉我哪些内容有帮助、哪里需要改进。', category: '反馈类型',
@@ -57,17 +58,18 @@
       proInviteBody: 'Pro 是可选支持。现有公开功能继续可用；US$1/月会激活 Pro 身份，并支持这个产品持续维护。',
       proPrice: 'US$1 / 月', stripeNote: '通过 Stripe 安全结账 · 可随时取消',
       proAccess: 'Pro 权限已激活', proGranted: '此账户已拥有 Pro 权限，目前没有需要管理的付费订阅。',
-      paidActive: 'Pro 订阅有效', billingOpening: '正在前往 Stripe…',
+      paidActive: 'Pro 订阅有效', trialActive: 'Pro 免费体验中', paymentAttention: '付款状态需要处理',
+      renewsOn: '下次续费', accessUntil: '已安排取消 · Pro 有效至', billingOpening: '正在前往 Stripe…',
       billingSuccess: '付款已完成，Pro 权限已更新。',
       billingPending: '付款已完成，正在确认 Pro 权限。你可以稍后刷新账户。',
       billingCancelled: '未完成付款。Free 使用不受影响。', noSubscription: '当前没有需要管理的付费订阅。',
     },
     en: {
       account: 'Account', shared: 'Shared Hao Apps account', free: 'Free', pro: 'Pro', optional: 'OPTIONAL SIGN-IN',
-      google: 'Continue with Google', github: 'Continue with GitHub', x: 'Continue with X', or: 'OR',
-      email: 'Email address', magic: 'Send sign-in link', sent: 'Sign-in link sent. Check your inbox.',
-      close: 'Close account', signOut: 'Sign out', refresh: 'Refresh account', save: 'Save name', displayName: 'Display name',
-      signedIn: 'Signed in', loading: 'Loading…', unavailable: 'Account service is temporarily unavailable. Try again shortly.',
+      google: 'Continue with Google', or: 'OR', email: 'Email address', magic: 'Send sign-in link',
+      sent: 'Sign-in link sent. Check your inbox.', close: 'Close', signOut: 'Sign out', refresh: 'Refresh account',
+      save: 'Save name', displayName: 'Display name', signedIn: 'Signed in', loading: 'Loading…',
+      unavailable: 'Account service is temporarily unavailable. Try again shortly.',
       billingUnavailable: 'Stripe checkout or subscription management is temporarily unavailable. Your account and current access are unaffected.',
       future: 'Account capabilities', billingOff: 'Paid features are not open yet. Current public features remain available.', manage: 'Manage subscription',
       feedback: 'Send feedback', feedbackPrompt: 'Tell us what helped and what should improve.', category: 'Feedback type',
@@ -78,7 +80,8 @@
       proInviteBody: 'Pro is optional support. Existing public features stay available; US$1/month activates your Pro identity and supports ongoing maintenance.',
       proPrice: 'US$1 / month', stripeNote: 'Secure checkout with Stripe · Cancel anytime',
       proAccess: 'Pro access active', proGranted: 'This account already has Pro access and has no paid subscription to manage.',
-      paidActive: 'Pro subscription active', billingOpening: 'Opening Stripe…',
+      paidActive: 'Pro subscription active', trialActive: 'Pro free trial active', paymentAttention: 'Payment needs attention',
+      renewsOn: 'Renews', accessUntil: 'Cancellation scheduled · Pro access through', billingOpening: 'Opening Stripe…',
       billingSuccess: 'Payment complete. Pro access is up to date.',
       billingPending: 'Payment complete. Pro access is still being confirmed. You can refresh the account shortly.',
       billingCancelled: 'Payment was not completed. Free access is unchanged.', noSubscription: 'There is no paid subscription to manage.',
@@ -92,6 +95,14 @@
   };
   const appName = () => String(config.appName || '').trim() || 'Hao Apps';
   const formatText = (value) => String(value || '').replace('{app}', appName());
+  const formatDate = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat(currentLanguage() === 'zh' ? 'zh-CN' : 'en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+    }).format(date);
+  };
 
   const icon = (name) => {
     const icons = {
@@ -99,8 +110,6 @@
       crown: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 4.5 4L12 4l4.5 6L21 6l-2 12H5L3 6Z"/><path d="M5 21h14"/></svg>',
       close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>',
       google: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"/><path d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.61A10 10 0 0 0 12 22Z"/><path d="M6.39 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.12-1.32.31-1.93V7.46H3.04A10 10 0 0 0 2 12c0 1.61.39 3.13 1.04 4.54l3.35-2.61Z"/><path d="M12 5.94c1.47 0 2.79.5 3.83 1.49l2.87-2.87A9.64 9.64 0 0 0 12 2a10 10 0 0 0-8.96 5.46l3.35 2.61C7.18 7.7 9.39 5.94 12 5.94Z"/></svg>',
-      github: '<svg viewBox="0 0 24 24" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.55 9.55 0 0 1 12 7.01c.85 0 1.71.11 2.51.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.86v2.57c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>',
-      x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="M4.2 3h4.6l4.2 5.6L17.8 3h2l-5.9 7.1L21 21h-4.6l-4.7-6.3L6.2 21h-2l6.6-7.8L4.2 3Zm3.6 1.7H7.5l9.8 14.6h1.2L8.8 4.7Z"/></svg>',
       mail: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
       refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.4-2L20 9M4 15l2.5 2a7 7 0 0 0 11.4-2"/></svg>',
       logout: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg>',
@@ -115,9 +124,17 @@
     console.warn('Hao Account:', error);
   }
 
+  async function optional(label, task) {
+    try {
+      await task();
+    } catch (error) {
+      console.warn(`Hao Account optional ${label}:`, error);
+    }
+  }
+
   function clearTurnstile() {
     if (turnstileWidgetId !== null && window.turnstile?.remove) {
-      try { window.turnstile.remove(turnstileWidgetId); } catch { /* widget is already gone */ }
+      try { window.turnstile.remove(turnstileWidgetId); } catch { /* already gone */ }
     }
     turnstileWidgetId = null;
     captchaToken = '';
@@ -215,7 +232,7 @@
   async function getClient() {
     if (state.client) return state.client;
     if (!config.supabaseUrl || !config.supabasePublishableKey) throw new Error('Account configuration is incomplete.');
-    const sdk = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    const sdk = await import(SUPABASE_JS_URL);
     state.client = sdk.createClient(config.supabaseUrl, config.supabasePublishableKey, {
       auth: {
         persistSession: true,
@@ -234,7 +251,8 @@
     if (error) throw error;
     if (data) {
       state.profile = data;
-      await client.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', state.user.id);
+      const { error: updateError } = await client.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', state.user.id);
+      if (updateError) throw updateError;
       return;
     }
     const metadata = state.user.user_metadata || {};
@@ -254,26 +272,27 @@
   async function touchProductAccount() {
     if (!state.user || !config.productCode) return;
     const client = await getClient();
-    const now = new Date().toISOString();
-    const { error } = await client.from('product_accounts').upsert({
+    const { data, error } = await client.from('product_accounts').upsert({
       user_id: state.user.id,
       product_code: config.productCode,
-      last_seen_at: now,
-    }, { onConflict: 'user_id,product_code' });
+      last_seen_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,product_code' }).select('*').single();
     if (error) throw error;
-    const { data, error: readError } = await client.from('product_accounts')
-      .select('*').eq('user_id', state.user.id).eq('product_code', config.productCode).maybeSingle();
-    if (readError) throw readError;
     state.productAccount = data;
   }
 
   async function refreshEntitlements() {
     state.entitlements = new Set();
-    if (!state.user) return;
+    if (!state.user || !config.entitlementCode) return;
     const client = await getClient();
     const { data, error } = await client.from('entitlements')
-      .select('entitlement_code,active,valid_until').eq('user_id', state.user.id);
-    if (error) throw error;
+      .select('entitlement_code,active,valid_until')
+      .eq('user_id', state.user.id)
+      .eq('entitlement_code', config.entitlementCode);
+    if (error) {
+      console.warn('Hao Account entitlement refresh failed closed:', error);
+      return;
+    }
     const now = Date.now();
     (data || []).forEach((row) => {
       const validUntil = row.valid_until ? new Date(row.valid_until).getTime() : null;
@@ -300,10 +319,14 @@
     state.productAccount = null;
     state.subscription = null;
     state.error = '';
+    state.entitlements = new Set();
     if (state.user) {
-      await Promise.all([ensureProfile(), touchProductAccount(), refreshEntitlements(), refreshSubscription()]);
-    } else {
-      state.entitlements = new Set();
+      await Promise.all([
+        optional('profile refresh', ensureProfile),
+        optional('product account refresh', touchProductAccount),
+        refreshEntitlements(),
+        optional('subscription refresh', refreshSubscription),
+      ]);
     }
     render();
     emit();
@@ -329,7 +352,7 @@
   }
 
   async function signInWithProvider(provider) {
-    if (!OAUTH_PROVIDERS.has(provider)) throw new Error(`Unsupported OAuth provider: ${provider}`);
+    if (provider !== OAUTH_PROVIDER) throw new Error(`Unsupported OAuth provider: ${provider}`);
     state.loading = true;
     state.error = '';
     render();
@@ -494,15 +517,6 @@
         body: JSON.stringify({ product_code: config.productCode }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (mode === 'portal' && response.status === 404) {
-        state.loading = false;
-        state.notice = t.noSubscription;
-        state.error = '';
-        await refreshSubscription().catch(() => {});
-        render();
-        emit();
-        return;
-      }
       if (!response.ok || !payload.url) throw new Error(payload.error || `Membership request failed (${response.status})`);
       window.location.assign(payload.url);
     } catch (error) {
@@ -544,6 +558,15 @@
     });
   }
 
+  function subscriptionSummary(t) {
+    if (!state.subscription) return '';
+    const date = formatDate(state.subscription.current_period_end);
+    if (state.subscription.cancel_at_period_end && date) return `${t.accessUntil} ${date}`;
+    if (['past_due', 'unpaid'].includes(state.subscription.status)) return t.paymentAttention;
+    if (state.subscription.status === 'trialing' && date) return `${t.trialActive} · ${date}`;
+    return date ? `${t.renewsOn} ${date}` : t.stripeNote;
+  }
+
   function buildProCard(isPro) {
     if (!config.billingEnabled) return null;
     const t = text();
@@ -559,9 +582,7 @@
     const title = document.createElement('strong');
     title.textContent = isPro ? `${appName()} Pro` : formatText(t.proInviteTitle);
     const body = document.createElement('p');
-    body.textContent = isPro
-      ? (paid ? t.stripeNote : t.proGranted)
-      : t.proInviteBody;
+    body.textContent = isPro ? (paid ? subscriptionSummary(t) : t.proGranted) : t.proInviteBody;
     copy.append(kicker, title, body);
 
     const action = document.createElement('div');
@@ -681,16 +702,16 @@
       badge.className = 'hao-account-status-chip';
       badge.textContent = t.optional;
       guest.appendChild(badge);
-      for (const provider of ['google', 'github', 'x']) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'hao-account-provider';
-        button.dataset.oauthProvider = provider;
-        button.innerHTML = `${icon(provider)}<span>${state.loading ? t.loading : t[provider]}</span>`;
-        button.disabled = state.loading;
-        button.addEventListener('click', () => void signInWithProvider(provider));
-        guest.appendChild(button);
-      }
+
+      const providerButton = document.createElement('button');
+      providerButton.type = 'button';
+      providerButton.className = 'hao-account-provider';
+      providerButton.dataset.oauthProvider = OAUTH_PROVIDER;
+      providerButton.innerHTML = `${icon('google')}<span>${state.loading ? t.loading : t.google}</span>`;
+      providerButton.disabled = state.loading;
+      providerButton.addEventListener('click', () => void signInWithProvider(OAUTH_PROVIDER));
+      guest.appendChild(providerButton);
+
       const divider = document.createElement('div');
       divider.className = 'hao-account-divider';
       divider.textContent = t.or;
@@ -921,10 +942,12 @@
       render();
       return;
     }
-    const waits = [0, 700, 1400];
-    for (const wait of waits) {
+    for (const wait of [0, 700, 1400]) {
       if (wait) await new Promise((resolve) => window.setTimeout(resolve, wait));
-      await Promise.all([refreshEntitlements(), refreshSubscription()]).catch(() => {});
+      await Promise.all([
+        refreshEntitlements(),
+        optional('subscription refresh after billing', refreshSubscription),
+      ]);
       if (state.entitlements.has(config.entitlementCode)) break;
     }
     state.notice = state.entitlements.has(config.entitlementCode) ? t.billingSuccess : t.billingPending;
@@ -967,7 +990,7 @@
     close,
     refresh,
     signInWithProvider,
-    can: (code) => state.entitlements.has(String(code || '')),
+    can: (code) => code === config.entitlementCode && state.entitlements.has(config.entitlementCode),
     getClient,
     saveProductData,
     submitFeedback,
