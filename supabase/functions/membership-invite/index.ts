@@ -285,11 +285,27 @@ Deno.serve(async (req: Request) => {
 
       const mappedCodes = new Set((mappingsResult.data ?? []).map((row) => String(row.product_code)));
       const products = (productsResult.data ?? []).filter((product) => mappedCodes.has(String(product.product_code)));
+      const inviteRows = invitesResult.data ?? [];
+      const redeemedUserIds = [...new Set(
+        inviteRows.map((row) => String(row.redeemed_by ?? "")).filter(Boolean),
+      )];
+      const redeemedEmailByUserId = new Map<string, string>();
+      await Promise.all(redeemedUserIds.map(async (userId) => {
+        const { data, error } = await admin.auth.admin.getUserById(userId);
+        if (!error && data.user?.email) redeemedEmailByUserId.set(userId, data.user.email);
+      }));
+      const recentInvites = inviteRows.map((row) => ({
+        ...row,
+        redeemed_email: row.redeemed_by
+          ? redeemedEmailByUserId.get(String(row.redeemed_by)) ?? null
+          : null,
+      }));
+
       return json(req, {
         actor: { id: actor.id, email: actor.email, role },
         can_create: ["owner", "operator"].includes(role),
         products,
-        recent_invites: invitesResult.data ?? [],
+        recent_invites: recentInvites,
       });
     }
 

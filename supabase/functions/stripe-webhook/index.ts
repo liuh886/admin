@@ -144,7 +144,11 @@ Deno.serve(async (req: Request) => {
 
     const productCode = String(subscription.metadata?.product_code ?? priceRow.product_code);
     const status = String(subscription.status ?? "unknown");
-    const currentPeriodEnd = isoFromUnix(subscription.current_period_end);
+    const currentPeriodEnd = isoFromUnix(
+      status === "trialing"
+        ? (subscription.trial_end ?? subscription.current_period_end)
+        : (subscription.current_period_end ?? subscription.trial_end),
+    );
     const active = ["active", "trialing", "past_due"].includes(status);
     const stripeProductId = idOf(price.product);
 

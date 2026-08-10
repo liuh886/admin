@@ -32,6 +32,7 @@ expect(webhook.includes('verifyStripeSignature'), 'Webhook must verify Stripe si
 expect(webhook.includes('customer.subscription.updated'), 'Webhook must process subscription updates');
 expect(webhook.includes('customer.subscription.deleted'), 'Webhook must process subscription deletion');
 expect(webhook.includes('invoice.payment_failed'), 'Webhook must reconcile failed invoice payment state');
+expect(webhook.includes('status === "trialing"') && webhook.includes('subscription.trial_end ?? subscription.current_period_end'), 'Trial subscriptions must persist the Stripe trial end instead of losing expiry');
 expect(webhook.includes('refresh_effective_entitlements'), 'Webhook must refresh effective entitlements after subscription changes');
 expect(webhook.includes('stripe_webhook_events'), 'Webhook events must remain auditable and idempotently recorded');
 expect(webhook.includes('cancel_at_period_end'), 'Subscription cancellation scheduling must be persisted');

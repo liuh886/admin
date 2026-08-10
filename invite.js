@@ -278,19 +278,34 @@ function renderRecentInvites(catalog) {
   const rows = catalog.recent_invites || [];
   target.innerHTML = rows.length ? rows.map((item) => {
     const state = item.redeemed_at
-      ? { label: '已激活', className: 'inactive', date: item.redeemed_at }
+      ? {
+          label: '已领取',
+          className: 'inactive',
+          date: item.redeemed_at,
+          detail: item.redeemed_email ? `领取：${item.redeemed_email} · 链接已失效` : '已领取 · 链接已失效'
+        }
       : item.redeemed_by
-        ? { label: '激活中', className: 'active', date: item.created_at }
-        : { label: '可用', className: 'active', date: item.created_at };
+        ? {
+            label: '领取处理中',
+            className: 'active',
+            date: item.created_at,
+            detail: item.redeemed_email ? `账号：${item.redeemed_email} · 已锁定` : '已锁定领取账号'
+          }
+        : {
+            label: '未领取',
+            className: 'active',
+            date: item.created_at,
+            detail: '链接仍可用'
+          };
     return `
       <article class="invite-record">
         <div>
           <strong>${escapeHtml(productNames(item.product_codes, productMap))}</strong>
-          <span>${escapeHtml(formatDuration(item.duration_days))}免费体验 · Stripe 订阅</span>
+          <span>邀请本身：${escapeHtml(formatDuration(item.duration_days))}免费体验 · Stripe trial</span>
         </div>
         <div class="invite-record-status">
           <span class="badge ${state.className}">${state.label}</span>
-          <small>${escapeHtml(formatDate(state.date))}</small>
+          <small>${escapeHtml(state.detail)} · ${escapeHtml(formatDate(state.date))}</small>
         </div>
       </article>`;
   }).join('') : '<p class="empty-copy">尚未生成邀请。</p>';
@@ -315,7 +330,7 @@ function ensureAdminModule(catalog) {
         <div>
           <p class="eyebrow">PRO INVITATIONS</p>
           <h2>一次性免费体验邀请</h2>
-          <p>选择一个或多个 Pro 产品与免费时长。邀请页会在登录前明确展示全部赠予产品、访问地址与三种登录入口。</p>
+          <p>选择一个或多个 Pro 产品与免费时长。每条链接只能由一个 Hao Apps 账号成功领取一次；领取完成后立即失效。</p>
         </div>
       </div>
       <div class="invite-admin-grid">
@@ -351,8 +366,9 @@ function ensureAdminModule(catalog) {
         </article>
       </div>
       <article class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">RECENT</p><h3>最近邀请</h3></div><span class="subtle">只显示状态，不恢复原始链接</span></div>
+        <div class="panel-heading"><div><p class="eyebrow">RECENT</p><h3>最近邀请</h3></div><span class="subtle">一次性链接 · 领取后失效</span></div>
         <div id="invite-recent-list" class="invite-record-list"></div>
+        <p class="subtle">这里显示的是邀请本身的期限。账号若同时拥有 owner、人工赠送等更长期授权，会员页最终有效期会按所有授权来源聚合，因此可能显示得更长。</p>
       </article>`;
     document.querySelector('.search-panel')?.before(section);
   }
@@ -395,7 +411,7 @@ function ensureAdminModule(catalog) {
           <input id="invite-generated-link" type="text" readonly value="${escapeHtml(shareUrl)}">
           <button id="invite-copy-link" class="button ghost compact" type="button">复制链接</button>
         </div>
-        <small>对方打开链接后，会先看到所获 Pro 产品与访问地址，再选择 Google、GitHub 或 X 登录。Google 作为推荐入口。</small>`;
+        <small>一次性链接：只能由一个 Hao Apps 账号成功领取一次，领取完成后立即失效。对方会先看到获赠产品与访问地址，再选择 Google、GitHub 或 X 登录。</small>`;
       resultBox.querySelector('#invite-copy-link')?.addEventListener('click', async () => {
         await navigator.clipboard.writeText(shareUrl);
         resultBox.querySelector('#invite-copy-link').textContent = '已复制';
