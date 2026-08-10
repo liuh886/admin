@@ -20,6 +20,7 @@ expect(checkout.includes('.eq("is_default", true)'), 'Checkout must use the acti
 expect(checkout.includes('mode", "subscription"'), 'Checkout must create Stripe subscriptions');
 expect(checkout.includes('client_reference_id'), 'Checkout must bind the Stripe session to the Supabase user');
 expect(checkout.includes('subscription_data[metadata][product_code]'), 'Checkout must preserve product ownership in subscription metadata');
+expect(checkout.includes('allow_promotion_codes'), 'Normal subscription Checkout must accept Stripe Promotion Codes');
 
 expect(portal.includes('userClient.auth.getUser(token)'), 'Customer Portal creation must authenticate the customer JWT');
 expect(portal.includes('billing_customers'), 'Customer Portal must resolve the canonical Stripe customer mapping');

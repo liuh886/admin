@@ -36,7 +36,7 @@ jobs:
           fi
           git diff --name-only "$BASE_SHA" "$GITHUB_SHA" > changed-files.txt
           cat changed-files.txt
-          if grep -Eq '^(index\.html|admin\.(js|css)|operations\.(js|css)|feedback-admin\.(js|css)|tests/e2e/|playwright\.config\.js|\.github/workflows/pages\.yml)' changed-files.txt; then
+          if grep -Eq '^(index\.html|admin\.(js|css)|operations\.(js|css)|feedback-admin\.(js|css)|(invite|promotion)\.(js|css)|tests/e2e/|playwright\.config\.js|\.github/workflows/pages\.yml)' changed-files.txt; then
             echo "browser=true" >> "$GITHUB_OUTPUT"
           else
             echo "browser=false" >> "$GITHUB_OUTPUT"
