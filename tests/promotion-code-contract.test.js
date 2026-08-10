@@ -35,6 +35,9 @@ expect(edge.includes('applies_to[products]'), 'Coupon must be limited to the sel
 expect(edge.includes('duration_in_months'), 'Fixed-length discounts must map to Stripe repeating coupon duration');
 expect(edge.includes('expires_at'), 'Campaign availability must map to Promotion Code expiry');
 expect(edge.includes('max_redemptions'), 'Promotion codes must support an optional redemption cap');
+expect(edge.includes('starting_after') && edge.includes('page.has_more'), 'Promotion catalog must paginate instead of silently stopping at one Stripe page');
+expect(edge.includes('couponParams.set("name", code.slice(0, 40))'), 'Coupon display names must respect Stripe’s 40-character limit');
+expect(edge.includes('existing.metadata?.hao_apps_source !== "admin_promotion"'), 'Promotion deactivation must reject codes outside the Hao Apps Admin boundary');
 expect(edge.includes('active: "false"'), 'Admin must be able to stop future redemptions without deleting history');
 expect(edge.includes('membership_admin_actions'), 'Promotion mutations must remain in the existing audit trail');
 expect(!edge.includes('.from("promotion'), 'Promotion state must not be duplicated into a new Supabase promotion table');
