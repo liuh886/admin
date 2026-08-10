@@ -179,6 +179,7 @@ Deno.serve(async (req: Request) => {
     params.set("cancel_url", billingUrl(product.app_url, "cancelled"));
     params.set("client_reference_id", userId);
     params.set("billing_address_collection", "auto");
+    params.set("allow_promotion_codes", "true");
     params.set("metadata[supabase_user_id]", userId);
     params.set("metadata[product_code]", product.product_code);
     params.set("subscription_data[metadata][supabase_user_id]", userId);
