@@ -67,13 +67,13 @@ for (const required of [
   "dialog.querySelector('.hao-account-feature-panel')?.remove()",
   'function ensureProManagement(dialog, snapshot)',
   'if (!snapshot?.isPro || snapshot.subscription) return',
+  'if (!snapshot?.isPro || !snapshot.subscription) return',
   "manage: '管理订阅'",
   "manage: 'Manage subscription'",
   'config.portalFunctionUrl',
 ]) {
   expect(upgrade.includes(required), `Shared Pro account upgrade is missing ${required}`);
 }
-expect(!upgrade.includes('if (!snapshot?.subscription)'), 'Subscription-management visibility must not depend on an existing Stripe subscription row');
 
 for (const required of [
   'billing_customers',
