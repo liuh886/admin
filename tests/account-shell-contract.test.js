@@ -31,19 +31,13 @@ for (const required of [
   expect(script.includes(required), `Shared account shell is missing ${required}`);
 }
 
-for (const required of [
-  "const OAUTH_PROVIDERS = new Set(['google', 'github', 'x'])",
-  'async function signInWithProvider(provider)',
-  "for (const provider of ['google', 'github', 'x'])",
-  "github: 'Continue with GitHub'",
-  "x: 'Continue with X'",
-  'button.dataset.oauthProvider = provider',
-]) {
-  expect(script.includes(required), `Shared account shell is missing multi-provider OAuth contract: ${required}`);
-}
-expect(!script.includes('signInWithGoogle'), 'Provider-specific Google auth helper must be removed in favor of the shared provider path');
+expect(script.includes("const SUPABASE_JS_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/+esm'"), 'Shared browser client must pin Supabase JS exactly');
+expect(script.includes("const OAUTH_PROVIDER = 'google'"), 'Shared account shell must expose only the verified Google OAuth provider');
+expect(!script.includes("github: 'Continue with GitHub'"), 'Unverified GitHub OAuth must not be rendered');
+expect(!script.includes("x: 'Continue with X'"), 'Unverified X OAuth must not be rendered');
+expect(script.includes('providerButton.dataset.oauthProvider = OAUTH_PROVIDER'), 'Google OAuth button must use the shared provider path');
 expect(script.includes("flowType: 'pkce'"), 'Browser auth must use PKCE');
-expect(script.includes('persistSession: true'), 'Account sessions must persist across Hao Apps on the shared origin');
+expect(script.includes('persistSession: true'), 'Account sessions must persist on the shared origin');
 expect(script.includes('config.billingEnabled'), 'Paid actions must remain controlled by the product config');
 expect(script.includes('config.feedbackEnabled'), 'Feedback must remain opt-in per product');
 expect(!script.includes("triggerHost.classList.add('is-floating')"), 'Shared account controls must never create a floating fallback');
@@ -51,6 +45,22 @@ expect(!css.includes('.hao-account-mount.is-floating'), 'Shared styles must not 
 expect(css.includes('.hao-account-dialog'), 'Shared account drawer styling must exist');
 expect(css.includes('@media (max-width: 640px)'), 'Account shell must include mobile behavior');
 expect(css.includes('prefers-reduced-motion'), 'Account shell must respect reduced motion');
+
+expect(script.includes(".eq('entitlement_code', config.entitlementCode)"), 'Browser entitlement reads must be limited to the current product entitlement');
+expect(script.includes("console.warn('Hao Account entitlement refresh failed closed:'"), 'Entitlement failures must fail closed');
+for (const optionalRead of [
+  "optional('profile refresh', ensureProfile)",
+  "optional('product account refresh', touchProductAccount)",
+  "optional('subscription refresh', refreshSubscription)",
+]) {
+  expect(script.includes(optionalRead), `Optional account read must not invalidate the auth session: ${optionalRead}`);
+}
+expect(script.includes("close: '关闭'"), 'Close control must describe closing the dialog, not closing the account');
+expect(script.includes("close: 'Close'"), 'English close control must describe closing the dialog');
+expect(script.includes('cancel_at_period_end'), 'Subscription cancellation scheduling must be available to the account UI');
+expect(script.includes("accessUntil: '已安排取消 · Pro 有效至'"), 'Scheduled cancellation must be explicit in Chinese');
+expect(script.includes("accessUntil: 'Cancellation scheduled · Pro access through'"), 'Scheduled cancellation must be explicit in English');
+expect(script.includes('function subscriptionSummary(t)'), 'Account shell must render subscription lifecycle state');
 
 for (const required of [
   'function removeInternalCapabilities(dialog)',
@@ -109,4 +119,4 @@ for (const forbidden of [
   expect(!forbidden.test(browser), `Shared browser assets contain forbidden secret material: ${forbidden}`);
 }
 
-console.log('Shared account UI keeps internal access rules private and gives every Pro account a Stripe subscription-management entry.');
+console.log('Shared account UI keeps auth resilient, entitlement reads product-scoped, billing lifecycle explicit, and secrets server-side.');
