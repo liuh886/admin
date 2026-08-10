@@ -88,6 +88,24 @@ async function stripeDeleteCoupon(couponId: string): Promise<void> {
   if (!response.ok) console.error("promotion coupon cleanup failed", couponId, response.status);
 }
 
+async function listPromotionCodes(): Promise<Record<string, any>[]> {
+  const promotions: Record<string, any>[] = [];
+  let startingAfter = "";
+
+  while (true) {
+    const params = new URLSearchParams({ limit: "100" });
+    if (startingAfter) params.set("starting_after", startingAfter);
+    const page = await stripeGet("promotion_codes", params);
+    const rows = Array.isArray(page.data) ? page.data as Record<string, any>[] : [];
+    promotions.push(...rows);
+    if (!page.has_more || rows.length === 0) break;
+    startingAfter = String(rows.at(-1)?.id ?? "");
+    if (!startingAfter) break;
+  }
+
+  return promotions;
+}
+
 function productCodes(value: unknown): string[] {
   if (!Array.isArray(value)) throw new Error("At least one Pro product is required.");
   const codes = [...new Set(value.map((item) => String(item ?? "").trim()).filter(Boolean))];
@@ -206,9 +224,7 @@ Deno.serve(async (req: Request) => {
 
     if (action === "catalog") {
       const products = await productsCatalog();
-      const listParams = new URLSearchParams({ limit: "50" });
-      const list = await stripeGet("promotion_codes", listParams);
-      const rawPromotions = (list.data ?? []) as Record<string, any>[];
+      const rawPromotions = await listPromotionCodes();
       const owned = rawPromotions.filter((item) => item.metadata?.hao_apps_source === "admin_promotion");
       const promotions = await Promise.all(owned.map(async (item) => {
         const couponId = couponIdFromPromotion(item);
@@ -263,7 +279,7 @@ Deno.serve(async (req: Request) => {
       couponParams.set("percent_off", String(discount));
       couponParams.set("duration", discountDuration.stripe);
       if (discountDuration.months) couponParams.set("duration_in_months", String(discountDuration.months));
-      couponParams.set("name", `${code} · ${pay}% pay`);
+      couponParams.set("name", code.slice(0, 40));
       couponParams.set("metadata[hao_apps_source]", "admin_promotion");
       couponParams.set("metadata[product_codes]", selectedCodes.join(","));
       couponParams.set("metadata[created_by]", actor.id);
@@ -327,6 +343,11 @@ Deno.serve(async (req: Request) => {
       if (!["owner", "operator"].includes(role)) return json(req, { error: "Operator access is required." }, 403);
       const promotionCodeId = String(body.promotion_code_id ?? "").trim();
       if (!/^promo_[A-Za-z0-9]+$/.test(promotionCodeId)) throw new Error("Invalid promotion code identifier.");
+
+      const existing = await stripeGet(`promotion_codes/${encodeURIComponent(promotionCodeId)}`);
+      if (existing.metadata?.hao_apps_source !== "admin_promotion") {
+        return json(req, { error: "This promotion code is not managed by Hao Apps Admin." }, 403);
+      }
 
       const params = new URLSearchParams({ active: "false" });
       const promotion = await stripePost(`promotion_codes/${encodeURIComponent(promotionCodeId)}`, params);
