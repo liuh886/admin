@@ -15,6 +15,9 @@ for (const [name, source] of [['checkout', checkout], ['portal', portal], ['webh
 }
 
 expect(checkout.includes('userClient.auth.getUser(token)'), 'Checkout must authenticate the customer JWT');
+expect(checkout.includes('.from("billing_products")'), 'Checkout must resolve the canonical product directly');
+expect(checkout.includes('.eq("product_code", requestedCode)'), 'Checkout input must be a canonical product_code');
+expect(!checkout.includes('.eq("entitlement_code", requestedCode)'), 'Checkout must not retain the obsolete entitlement-code compatibility path');
 expect(checkout.includes('.from("billing_prices")'), 'Checkout must resolve price IDs from the server-side catalog');
 expect(checkout.includes('.eq("is_default", true)'), 'Checkout must use the active default price');
 expect(checkout.includes('mode", "subscription"'), 'Checkout must create Stripe subscriptions');

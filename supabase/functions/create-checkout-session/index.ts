@@ -95,29 +95,13 @@ Deno.serve(async (req: Request) => {
     const requestedCode = String(input.product_code ?? "").trim();
     if (!requestedCode) return json(req, { error: "product_code is required" }, 400);
 
-    let { data: product } = await admin
+    const { data: product, error: productError } = await admin
       .from("billing_products")
       .select("product_code,name,app_url,active")
       .eq("product_code", requestedCode)
       .eq("active", true)
       .maybeSingle();
-
-    if (!product) {
-      const { data: mapping } = await admin
-        .from("billing_product_entitlements")
-        .select("product_code")
-        .eq("entitlement_code", requestedCode)
-        .maybeSingle();
-      if (mapping) {
-        const result = await admin
-          .from("billing_products")
-          .select("product_code,name,app_url,active")
-          .eq("product_code", mapping.product_code)
-          .eq("active", true)
-          .maybeSingle();
-        product = result.data;
-      }
-    }
+    if (productError) throw productError;
     if (!product) return json(req, { error: "Unknown or inactive product" }, 404);
 
     const { data: price, error: priceError } = await admin
