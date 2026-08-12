@@ -24,7 +24,7 @@ expect(edge.includes('const ALPHA_PRODUCT_CODE = "alpha_engine"'), 'Referral pro
 expect(edge.includes('const ALPHA_ENTITLEMENT_CODE = "alpha_engine.pro"'), 'Referral authorization must use the canonical Alpha Engine Pro entitlement');
 expect(edge.includes('const ALPHA_REFERRAL_DAYS = 30'), 'Referral trial duration must be fixed to 30 days server-side');
 expect(!referralBlock.includes('body.duration_days') && !referralBlock.includes('body.product_codes'), 'Referral callers must not choose trial duration or product');
-expect(edge.includes('if (invite.created_by === actor.id)'), 'Invitation redemption must reject self-referrals');
+expect(edge.includes('if (isAlphaReferral && invite.created_by === actor.id)'), 'Alpha Engine referral redemption must reject self-referrals without changing other invite semantics');
 expect(edge.includes('This Alpha Engine account has already had Pro access'), 'Alpha Engine referral trials must be limited to new-to-Pro recipients');
 expect(edge.includes('.eq("product_code", ALPHA_PRODUCT_CODE)') && edge.includes('.eq("entitlement_code", ALPHA_ENTITLEMENT_CODE)'), 'Referral eligibility must check both subscription and entitlement history');
 expect(edge.includes('if (action === "redeem")'), 'Recipient redemption must remain a separate customer action');
