@@ -449,15 +449,16 @@ Deno.serve(async (req: Request) => {
       if (invite.redeemed_by && invite.redeemed_by !== actor.id) {
         throw new Error("Invitation link has already been claimed.");
       }
-      if (invite.created_by === actor.id) {
-        throw new Error("Self-referral is not allowed.");
-      }
 
       const selectedCodes = productCodes(invite.product_codes);
       const days = durationDays(invite.duration_days);
       const isAlphaReferral = selectedCodes.length === 1
         && selectedCodes[0] === ALPHA_PRODUCT_CODE
         && days === ALPHA_REFERRAL_DAYS;
+
+      if (isAlphaReferral && invite.created_by === actor.id) {
+        throw new Error("Self-referral is not allowed.");
+      }
 
       if (isAlphaReferral) {
         const [subscriptionHistory, entitlementHistory] = await Promise.all([
