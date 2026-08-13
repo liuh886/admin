@@ -8,9 +8,6 @@ const ALLOWED_ORIGINS = new Set([
 const ADMIN_URL = "https://liuh886.github.io/admin/";
 const MAX_DURATION_DAYS = 730;
 const MANAGEABLE_STATUSES = ["active", "trialing", "past_due", "unpaid"];
-const ALPHA_PRODUCT_CODE = "alpha_engine";
-const ALPHA_ENTITLEMENT_CODE = "alpha_engine.pro";
-const ALPHA_REFERRAL_DAYS = 30;
 
 function namedEnv(name: string, legacyName: string): string {
   const raw = Deno.env.get(name);
@@ -170,20 +167,6 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (error || !data?.active) return null;
     return String(data.role);
-  }
-
-  async function hasActiveEntitlement(entitlementCode: string): Promise<boolean> {
-    const { data, error } = await admin
-      .from("entitlements")
-      .select("active,valid_until")
-      .eq("user_id", actor.id)
-      .eq("entitlement_code", entitlementCode)
-      .maybeSingle();
-    if (error) throw error;
-    if (data?.active !== true) return false;
-    if (!data.valid_until) return true;
-    const validUntil = new Date(String(data.valid_until));
-    return !Number.isNaN(validUntil.getTime()) && validUntil.getTime() > Date.now();
   }
 
   async function ensureCustomer(): Promise<string> {
@@ -387,53 +370,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (action === "create_referral") {
-      if (!(await hasActiveEntitlement(ALPHA_ENTITLEMENT_CODE))) {
-        return json(req, { error: "Active Alpha Engine Pro access is required to create a referral." }, 403);
-      }
-
-      const [productResult, mappingResult] = await Promise.all([
-        admin.from("billing_products")
-          .select("product_code,name,app_url,active")
-          .eq("product_code", ALPHA_PRODUCT_CODE)
-          .eq("active", true)
-          .maybeSingle(),
-        admin.from("billing_product_entitlements")
-          .select("product_code,entitlement_code")
-          .eq("product_code", ALPHA_PRODUCT_CODE)
-          .eq("entitlement_code", ALPHA_ENTITLEMENT_CODE)
-          .maybeSingle(),
-      ]);
-      if (productResult.error) throw productResult.error;
-      if (mappingResult.error) throw mappingResult.error;
-      if (!productResult.data || !mappingResult.data) {
-        throw new Error("Alpha Engine Pro referral is not configured for billing.");
-      }
-
-      const rawToken = randomToken();
-      const tokenHash = await sha256Hex(rawToken);
-      const { data: invite, error: insertError } = await admin
-        .from("membership_invites")
-        .insert({
-          token_hash: tokenHash,
-          product_codes: [ALPHA_PRODUCT_CODE],
-          duration_days: ALPHA_REFERRAL_DAYS,
-          created_by: actor.id,
-        })
-        .select("id,created_at")
-        .single();
-      if (insertError || !invite) throw insertError ?? new Error("Referral invitation could not be created.");
-
-      return json(req, {
-        ok: true,
-        invite_id: invite.id,
-        created_at: invite.created_at,
-        products: [productResult.data],
-        duration_days: ALPHA_REFERRAL_DAYS,
-        invite_url: `${ADMIN_URL}#invite=${encodeURIComponent(rawToken)}`,
-      });
-    }
-
     if (action === "redeem") {
       const rawToken = String(body.token ?? "").trim().toLowerCase();
       if (!/^[a-f0-9]{64}$/.test(rawToken)) throw new Error("Invitation link is invalid.");
@@ -452,33 +388,6 @@ Deno.serve(async (req: Request) => {
 
       const selectedCodes = productCodes(invite.product_codes);
       const days = durationDays(invite.duration_days);
-      const isAlphaReferral = selectedCodes.length === 1
-        && selectedCodes[0] === ALPHA_PRODUCT_CODE
-        && days === ALPHA_REFERRAL_DAYS;
-
-      if (isAlphaReferral && invite.created_by === actor.id) {
-        throw new Error("Self-referral is not allowed.");
-      }
-
-      if (isAlphaReferral) {
-        const [subscriptionHistory, entitlementHistory] = await Promise.all([
-          admin.from("subscriptions")
-            .select("id")
-            .eq("user_id", actor.id)
-            .eq("product_code", ALPHA_PRODUCT_CODE)
-            .limit(1),
-          admin.from("entitlement_grants")
-            .select("source_ref")
-            .eq("user_id", actor.id)
-            .eq("entitlement_code", ALPHA_ENTITLEMENT_CODE)
-            .limit(1),
-        ]);
-        if (subscriptionHistory.error) throw subscriptionHistory.error;
-        if (entitlementHistory.error) throw entitlementHistory.error;
-        if ((subscriptionHistory.data?.length ?? 0) > 0 || (entitlementHistory.data?.length ?? 0) > 0) {
-          throw new Error("This Alpha Engine account has already had Pro access and is not eligible for another referral trial.");
-        }
-      }
 
       if (!invite.redeemed_by) {
         const { data: claimed, error: claimError } = await admin

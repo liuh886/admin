@@ -1,0 +1,69 @@
+.referral-policy-section {
+  margin: 26px 0;
+}
+
+.referral-policy-section[hidden] {
+  display: none !important;
+}
+
+.referral-policy-list {
+  display: grid;
+  gap: 10px;
+}
+
+.referral-policy-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.2fr) minmax(130px, .7fr) minmax(220px, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.referral-policy-row:last-child {
+  border-bottom: 0;
+}
+
+.referral-policy-product,
+.referral-policy-row label {
+  display: grid;
+  gap: 4px;
+}
+
+.referral-policy-product small,
+.referral-policy-row label > span,
+.referral-policy-metrics {
+  color: var(--muted, #6b7280);
+  font-size: 11px;
+}
+
+.referral-days-input {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.referral-days-input input {
+  width: 88px;
+  min-height: 38px;
+}
+
+.referral-policy-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.referral-policy-metrics strong {
+  color: var(--text, #111827);
+}
+
+@media (max-width: 760px) {
+  .referral-policy-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .referral-policy-metrics {
+    grid-column: 1 / -1;
+  }
+}

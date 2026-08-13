@@ -16,17 +16,8 @@ expect(edge.includes('npm:@supabase/supabase-js@2.111.0'), 'Invitation Edge Func
 expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Invitation creation must independently verify AAL2');
 expect(edge.includes('data.currentLevel !== "aal2"'), 'Invitation creation must fail closed below AAL2');
 expect(edge.includes('if (action === "create")') && edge.includes('await requireAal2();'), 'Privileged invitation creation must require AAL2');
-expect(edge.includes('if (action === "create_referral")'), 'Alpha Engine member referral creation must use the existing invitation service');
-const referralBlock = edge.slice(edge.indexOf('if (action === "create_referral")'), edge.indexOf('if (action === "redeem")'));
-expect(!referralBlock.includes('requireAal2'), 'Member referral creation must not inherit the admin AAL2 gate');
-expect(referralBlock.includes('hasActiveEntitlement(ALPHA_ENTITLEMENT_CODE)'), 'Referral creation must verify active Alpha Engine Pro server-side');
-expect(edge.includes('const ALPHA_PRODUCT_CODE = "alpha_engine"'), 'Referral product must be fixed to Alpha Engine');
-expect(edge.includes('const ALPHA_ENTITLEMENT_CODE = "alpha_engine.pro"'), 'Referral authorization must use the canonical Alpha Engine Pro entitlement');
-expect(edge.includes('const ALPHA_REFERRAL_DAYS = 30'), 'Referral trial duration must be fixed to 30 days server-side');
-expect(!referralBlock.includes('body.duration_days') && !referralBlock.includes('body.product_codes'), 'Referral callers must not choose trial duration or product');
-expect(edge.includes('if (isAlphaReferral && invite.created_by === actor.id)'), 'Alpha Engine referral redemption must reject self-referrals without changing other invite semantics');
-expect(edge.includes('This Alpha Engine account has already had Pro access'), 'Alpha Engine referral trials must be limited to new-to-Pro recipients');
-expect(edge.includes('.eq("product_code", ALPHA_PRODUCT_CODE)') && edge.includes('.eq("entitlement_code", ALPHA_ENTITLEMENT_CODE)'), 'Referral eligibility must check both subscription and entitlement history');
+expect(!edge.includes('create_referral'), 'Product referrals must not remain inside the one-time membership invitation service');
+expect(!edge.includes('ALPHA_REFERRAL_DAYS') && !edge.includes('ALPHA_ENTITLEMENT_CODE'), 'Product-specific referral policy must not remain in membership-invite');
 expect(edge.includes('if (action === "redeem")'), 'Recipient redemption must remain a separate customer action');
 expect(edge.includes('#invite='), 'Generated invitation URLs must keep the raw token in the URL fragment');
 expect(browser.includes('window.location.hash.slice(1)'), 'Invitation redemption must read the token from the URL fragment');
@@ -80,4 +71,4 @@ expect(schema.includes('(redeemed_by is not null)'), 'Schema must allow the clai
 expect(!schema.includes('create or replace function public.redeem_membership_invite'), 'Schema must not create a parallel direct-grant redemption path');
 expect(!browser.includes('service_role'), 'Browser invitation code must never reference service-role credentials');
 
-console.log('Stripe-managed multi-product Pro invitation and Alpha Engine referral contract checks passed');
+console.log('Stripe-managed operator invitation contract checks passed');
