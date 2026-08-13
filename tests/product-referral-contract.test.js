@@ -16,6 +16,8 @@ expect(schema.includes('create table if not exists public.product_referral_codes
 expect(schema.includes('primary key (user_id, product_code)'), 'Referral identity must be stable per user and product');
 expect(schema.includes('create table if not exists public.product_referral_attributions'), 'Referral acceptance must have a canonical attribution ledger');
 expect(schema.includes('unique (product_code, invitee_user_id)'), 'An account may accept only one referral attribution per product');
+expect(schema.includes('on conflict on constraint product_referral_attributions_invitee_unique do nothing'), 'Referral redemption must target the named attribution uniqueness constraint without PL/pgSQL output-variable ambiguity');
+expect(!schema.includes('on conflict (product_code, invitee_user_id) do nothing'), 'Ambiguous column-list conflict syntax must not return');
 expect(schema.includes('invitee_user_id <> inviter_user_id'), 'Self-referral must fail at the database boundary');
 expect(schema.includes('alter table public.product_referral_codes enable row level security'), 'Referral code table must enable RLS');
 expect(schema.includes('alter table public.product_referral_attributions enable row level security'), 'Referral attribution table must enable RLS');
