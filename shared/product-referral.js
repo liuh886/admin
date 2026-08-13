@@ -28,37 +28,43 @@
 
   const copy = {
     zh: {
-      invite: '邀请',
+      invite: '邀请朋友',
       title: '邀请朋友使用 {app}',
-      stable: '这是你的长期专属邀请链接。',
-      proBenefit: '你当前是 Pro；新用户通过此链接加入，可获得 {days} 天 {app} Pro 免费体验。',
-      freeBenefit: '链接长期有效。你成为 Pro 后，新用户领取时会自动获得当时 Admin 配置的 Pro 免费体验。',
+      stable: '你的专属邀请链接长期有效。',
+      linkLabel: '专属邀请链接',
+      proHeadline: '送朋友 {days} 天 Pro',
+      proBenefit: '你当前是 Pro。新用户通过这个链接加入 {app}，可获得 {days} 天 Pro 免费体验。',
+      freeHeadline: '分享你的专属邀请链接',
+      freeBenefit: '链接不会变化。你成为 Pro 后，符合条件的新用户会按 Admin 当时设置的时长获得 Pro 体验。',
       joined: '已加入',
-      trials: '已激活体验',
+      trials: '已领取 Pro',
       copyLink: '复制链接',
       copied: '已复制',
       share: '分享邀请',
-      refresh: '刷新',
-      loading: '正在生成你的专属邀请链接…',
+      retry: '重试',
+      loading: '正在准备你的邀请链接…',
       unavailable: '邀请服务暂时不可用。',
       close: '关闭',
       shareTitle: '我邀请你试试 {app}',
-      shareTextPro: '通过我的邀请加入 {app}，你可以获得 {days} 天 Pro 免费体验。',
+      shareTextPro: '通过我的邀请加入 {app}，可获得 {days} 天 Pro 免费体验。',
       shareTextFree: '通过我的专属邀请加入 {app}。',
     },
     en: {
-      invite: 'Invite',
-      title: 'Invite friends to {app}',
-      stable: 'This is your permanent personal referral link.',
-      proBenefit: 'You are currently Pro. New users who join through this link can activate {days} days of {app} Pro free.',
-      freeBenefit: 'Your link is permanent. If you become Pro, the current Admin-configured Pro benefit is applied when a new user redeems it.',
+      invite: 'Invite friends',
+      title: 'Invite a friend to {app}',
+      stable: 'Your personal invite link stays the same.',
+      linkLabel: 'Personal invite link',
+      proHeadline: 'Give a friend {days} days of Pro',
+      proBenefit: 'You are currently Pro. Eligible new users who join {app} with this link get {days} days of Pro free.',
+      freeHeadline: 'Share your personal invite link',
+      freeBenefit: 'Your link is permanent. If you become Pro, eligible new users receive the Admin-configured Pro trial at redemption time.',
       joined: 'Joined',
-      trials: 'Pro trials',
+      trials: 'Pro activated',
       copyLink: 'Copy link',
       copied: 'Copied',
       share: 'Share invite',
-      refresh: 'Refresh',
-      loading: 'Creating your personal referral link…',
+      retry: 'Try again',
+      loading: 'Preparing your invite link…',
       unavailable: 'Referral service is temporarily unavailable.',
       close: 'Close',
       shareTitle: 'I invited you to try {app}',
@@ -204,6 +210,12 @@
   };
 
   const renderTrigger = () => {
+    if (config.standaloneReferralTrigger === false) {
+      if (host?.childElementCount) host.replaceChildren();
+      triggerUserId = '';
+      return;
+    }
+
     const mount = ensureHost();
     if (!mount) return;
     const userId = String(state.account?.user?.id || '');
@@ -243,37 +255,38 @@
       <section class="hao-referral-dialog" role="dialog" aria-modal="true" aria-labelledby="hao-referral-title">
         <header>
           <div>
-            <p>HAO APPS · REFERRAL</p>
             <h2 id="hao-referral-title">${format(t().title)}</h2>
+            <p class="hao-referral-intro">${t().stable}</p>
           </div>
           <button class="hao-referral-close" type="button" aria-label="${t().close}">×</button>
         </header>
-        ${state.loading ? `<p class="hao-referral-status">${t().loading}</p>` : ''}
-        ${state.error ? `<p class="hao-referral-status is-error">${state.error}</p>` : ''}
+        ${state.loading ? `<div class="hao-referral-loading"><span></span><p>${t().loading}</p></div>` : ''}
+        ${state.error ? `<div class="hao-referral-status is-error"><p>${state.error}</p><button type="button" data-referral-action="retry">${t().retry}</button></div>` : ''}
         ${referral ? `
           <div class="hao-referral-benefit ${days > 0 ? 'is-pro' : ''}">
-            <strong>${days > 0 ? `${days} days Pro` : t().stable}</strong>
+            <strong>${format(days > 0 ? t().proHeadline : t().freeHeadline, days)}</strong>
             <span>${format(days > 0 ? t().proBenefit : t().freeBenefit, days)}</span>
           </div>
           <div class="hao-referral-link">
-            <span>${t().stable}</span>
-            <code>${referral.referral_url}</code>
+            <span>${t().linkLabel}</span>
+            <div>
+              <code>${referral.referral_url}</code>
+              <button type="button" data-referral-action="copy">${state.copied ? t().copied : t().copyLink}</button>
+            </div>
           </div>
-          <div class="hao-referral-stats">
-            <div><strong>${joined}</strong><span>${t().joined}</span></div>
-            <div><strong>${trials}</strong><span>${t().trials}</span></div>
-          </div>
-          <div class="hao-referral-actions">
-            <button type="button" data-referral-action="copy">${state.copied ? t().copied : t().copyLink}</button>
-            <button type="button" class="is-primary" data-referral-action="share">${t().share}</button>
-            <button type="button" data-referral-action="refresh">${t().refresh}</button>
+          <div class="hao-referral-footer">
+            <div class="hao-referral-stats" aria-label="Referral activity">
+              <span><strong>${joined}</strong> ${t().joined}</span>
+              <span><strong>${trials}</strong> ${t().trials}</span>
+            </div>
+            <button type="button" class="hao-referral-share" data-referral-action="share">${t().share}</button>
           </div>
         ` : ''}
       </section>`;
     root.querySelector('.hao-referral-close')?.addEventListener('click', close);
     root.querySelector('[data-referral-action="copy"]')?.addEventListener('click', () => void copyLink());
     root.querySelector('[data-referral-action="share"]')?.addEventListener('click', () => void shareLink());
-    root.querySelector('[data-referral-action="refresh"]')?.addEventListener('click', () => void loadReferral(true));
+    root.querySelector('[data-referral-action="retry"]')?.addEventListener('click', () => void loadReferral(true));
   };
 
   const render = () => {
@@ -308,6 +321,7 @@
   });
   window.addEventListener('hao:account-changed', (event) => hydrate(event.detail));
   const observer = new MutationObserver(() => {
+    if (config.standaloneReferralTrigger === false) return;
     const mount = findMount();
     if (!mount) return;
     if (!host || !host.isConnected || host.parentElement !== mount) renderTrigger();

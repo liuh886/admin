@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.111.0";
+import { corsHeaders as sdkCorsHeaders } from "npm:@supabase/supabase-js@2.111.0/cors";
 
 const ALLOWED_ORIGINS = new Set([
   "https://liuh886.github.io",
@@ -35,8 +36,8 @@ function namedEnv(name: string, legacyName: string): string {
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") ?? "";
   return {
+    ...sdkCorsHeaders,
     "Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin) ? origin : "https://liuh886.github.io",
-    "Access-Control-Allow-Headers": "authorization, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Cache-Control": "private, no-store",
     Vary: "Origin",
