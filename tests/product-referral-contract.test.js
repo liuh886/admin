@@ -34,12 +34,16 @@ expect(edge.includes('auth.getUser(token)'), 'Authenticated referral actions mus
 expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Referral policy mutations must require AAL2');
 expect(edge.includes('product_referral_codes'), 'Stable referral links must be resolved server-side');
 expect(edge.includes('product_referral_attributions'), 'Referral conversion counts must come from the attribution ledger');
+expect(edge.includes('supabase-js@2.111.0/cors'), 'Browser Edge Function CORS headers must come from the maintained Supabase SDK contract');
+expect(edge.includes('...sdkCorsHeaders'), 'Referral CORS responses must inherit all headers required by current Supabase clients');
+expect(!edge.includes('"Access-Control-Allow-Headers": "authorization, apikey, content-type"'), 'The stale hand-maintained CORS allow-header list must not return');
 expect(!edge.includes('ALPHA_REFERRAL_DAYS'), 'Shared referral policy must not contain product-specific trial constants');
 
 expect(shared.includes("config.referralEnabled !== true"), 'Products must opt into the shared referral UI explicitly');
 expect(shared.includes("api('get_or_create')"), 'Signed-in users must receive their stable server-owned referral link');
 expect(shared.includes('joined_count') && shared.includes('trial_count'), 'Inviters must see joined and Pro-trial conversion counts');
 expect(shared.includes('navigator.share') && shared.includes('navigator.clipboard.writeText'), 'Referral sharing must support native share with clipboard fallback');
+expect(shared.includes('config.standaloneReferralTrigger === false'), 'Products with an existing share menu must be able to embed Invite without a duplicate standalone trigger');
 expect(shared.includes("if (existing && triggerUserId === userId) return;"), 'Referral trigger rendering must be idempotent for the current signed-in user');
 expect(shared.includes("if (!host || !host.isConnected || host.parentElement !== mount) renderTrigger();"), 'Mutation observation must only remount a missing or displaced referral host');
 expect(!shared.includes('new MutationObserver(() => renderTrigger())'), 'Mutation observation must never blindly rerender the trigger on its own DOM writes');
