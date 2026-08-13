@@ -4,6 +4,7 @@
   const config = window.HaoAccountConfig || {};
   if (!config.enabled || config.referralEnabled !== true) return;
 
+  const PENDING_OPEN_KEY = `hao_product_referral_pending_open:${config.productCode || 'app'}`;
   const state = {
     account: null,
     referral: null,
@@ -86,6 +87,20 @@
         ...extra,
       });
     } catch { /* analytics is non-blocking */ }
+  };
+
+  const rememberPendingOpen = () => {
+    try { window.sessionStorage.setItem(PENDING_OPEN_KEY, '1'); } catch { /* session storage is optional */ }
+  };
+
+  const consumePendingOpen = () => {
+    try {
+      const pending = window.sessionStorage.getItem(PENDING_OPEN_KEY) === '1';
+      if (pending) window.sessionStorage.removeItem(PENDING_OPEN_KEY);
+      return pending;
+    } catch {
+      return false;
+    }
   };
 
   const findMount = () => {
@@ -191,6 +206,7 @@
 
   const open = () => {
     if (!state.account?.user) {
+      rememberPendingOpen();
       window.HaoAccount?.open?.();
       return;
     }
@@ -306,6 +322,7 @@
     }
     if (!next) close();
     render();
+    if (next && consumePendingOpen()) window.setTimeout(open, 0);
   };
 
   const start = () => {
