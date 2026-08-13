@@ -2,7 +2,6 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const SUPABASE_URL = 'https://blgwlycfcwvsupmqyqwn.supabase.co';
 const PUBLISHABLE_KEY = 'sb_publishable_n1Va-c_alpkQ0zNuJYUaxA_J0u68RVW';
-const REFERRAL_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/product-referral`;
 const ADMIN_URL = 'https://liuh886.github.io/admin/';
 const REFERRAL_STORAGE_KEY = 'hao_product_referral_code';
 const TURNSTILE_SITE_KEY = '0x4AAAAAAEKVMnWa2valozxW';
@@ -18,12 +17,10 @@ const escapeHtml = (value) => String(value ?? '')
   .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
 
 function referralFromLocation() {
-  const params = new URLSearchParams(window.location.hash.slice(1));
-  const fromUrl = String(params.get('ref') || '').trim().toUpperCase();
-  if (fromUrl) {
-    localStorage.setItem(REFERRAL_STORAGE_KEY, fromUrl);
-    window.history.replaceState({}, '', ADMIN_URL);
-  }
+  const query = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  const fromUrl = String(query.get('ref') || hash.get('ref') || '').trim().toUpperCase();
+  if (fromUrl) localStorage.setItem(REFERRAL_STORAGE_KEY, fromUrl);
   return fromUrl || String(localStorage.getItem(REFERRAL_STORAGE_KEY) || '').trim().toUpperCase();
 }
 
@@ -53,24 +50,23 @@ if (!referralMode) {
     } catch { /* analytics is non-blocking */ }
   };
 
-  const callReferral = async (action, payload = {}, authenticated = false) => {
-    const headers = {
-      apikey: PUBLISHABLE_KEY,
-      'Content-Type': 'application/json'
-    };
-    if (authenticated) {
-      const { data, error } = await client.auth.getSession();
-      if (error || !data.session?.access_token) throw new Error('请先登录后继续。');
-      headers.Authorization = `Bearer ${data.session.access_token}`;
-    }
-    const response = await fetch(REFERRAL_FUNCTION_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ action, referral_code: referralCode, ...payload })
+  const referralAuthRedirectUrl = () => {
+    const url = new URL(ADMIN_URL);
+    url.searchParams.set('ref', referralCode);
+    return url.toString();
+  };
+
+  const cleanReferralLocation = () => {
+    if (window.location.href !== ADMIN_URL) window.history.replaceState({}, '', ADMIN_URL);
+  };
+
+  const callReferral = async (action) => {
+    const { data, error } = await client.functions.invoke('product-referral', {
+      body: { action, referral_code: referralCode }
     });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.ok !== true) throw new Error(result.error || '邀请服务暂时不可用。');
-    return result;
+    if (error) throw new Error(error.message || '邀请服务暂时不可用。');
+    if (data?.ok !== true) throw new Error(data?.error || '邀请服务暂时不可用。');
+    return data;
   };
 
   const shell = () => {
@@ -157,7 +153,7 @@ if (!referralMode) {
     track('referral_sign_in_start', { method: provider });
     const { error } = await client.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: ADMIN_URL }
+      options: { redirectTo: referralAuthRedirectUrl() }
     });
     if (error) renderLogin(error.message);
   };
@@ -178,7 +174,7 @@ if (!referralMode) {
     const { error } = await client.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: ADMIN_URL,
+        emailRedirectTo: referralAuthRedirectUrl(),
         shouldCreateUser: true,
         captchaToken
       }
@@ -261,7 +257,7 @@ if (!referralMode) {
         <p class="referral-lead">正在为 ${escapeHtml(session.user.email || '当前账号')} 记录产品归因并检查 Pro 免费体验资格…</p>
       </div>`;
     try {
-      const result = await callReferral('redeem', {}, true);
+      const result = await callReferral('redeem');
       localStorage.removeItem(REFERRAL_STORAGE_KEY);
       track('referral_redeem', { benefit_granted: result.benefit_granted ? 1 : 0 });
       if (result.benefit_granted) track('referral_pro_activated', { trial_days: result.trial_days });
@@ -294,6 +290,7 @@ if (!referralMode) {
       track('referral_landing_view');
       const { data, error } = await client.auth.getSession();
       if (error) throw error;
+      cleanReferralLocation();
       if (data.session) renderReady(data.session);
       else renderLogin();
     } catch (error) {
@@ -312,8 +309,10 @@ if (!referralMode) {
   client.auth.onAuthStateChange((_event, session) => {
     window.setTimeout(() => {
       if (!preview) return;
-      if (session) renderReady(session);
-      else renderLogin();
+      if (session) {
+        cleanReferralLocation();
+        renderReady(session);
+      } else renderLogin();
     }, 0);
   });
 
