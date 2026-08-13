@@ -17,6 +17,7 @@
   let overlay = null;
   let unsubscribe = null;
   let resetCopiedTimer = 0;
+  let triggerUserId = '';
 
   const language = () => {
     if (config.language === 'zh' || config.language === 'en') return config.language;
@@ -205,10 +206,17 @@
   const renderTrigger = () => {
     const mount = ensureHost();
     if (!mount) return;
-    if (!state.account?.user) {
-      mount.replaceChildren();
+    const userId = String(state.account?.user?.id || '');
+    const existing = mount.querySelector('.hao-referral-trigger');
+
+    if (!userId) {
+      if (mount.childElementCount) mount.replaceChildren();
+      triggerUserId = '';
       return;
     }
+
+    if (existing && triggerUserId === userId) return;
+
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'hao-referral-trigger';
@@ -216,13 +224,14 @@
     button.innerHTML = `<span aria-hidden="true">↗</span><span>${t().invite}</span>`;
     button.addEventListener('click', open);
     mount.replaceChildren(button);
+    triggerUserId = userId;
   };
 
   const renderOverlay = () => {
     const root = ensureOverlay();
     if (!state.open) {
       root.hidden = true;
-      root.replaceChildren();
+      if (root.childElementCount) root.replaceChildren();
       return;
     }
     root.hidden = false;
@@ -280,6 +289,7 @@
       state.referral = null;
       state.error = '';
       state.copied = false;
+      triggerUserId = '';
     }
     if (!next) close();
     render();
@@ -297,7 +307,11 @@
     if (event.key === 'Escape' && state.open) close();
   });
   window.addEventListener('hao:account-changed', (event) => hydrate(event.detail));
-  const observer = new MutationObserver(() => renderTrigger());
+  const observer = new MutationObserver(() => {
+    const mount = findMount();
+    if (!mount) return;
+    if (!host || !host.isConnected || host.parentElement !== mount) renderTrigger();
+  });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   if (!start()) {

@@ -40,6 +40,9 @@ expect(shared.includes("config.referralEnabled !== true"), 'Products must opt in
 expect(shared.includes("api('get_or_create')"), 'Signed-in users must receive their stable server-owned referral link');
 expect(shared.includes('joined_count') && shared.includes('trial_count'), 'Inviters must see joined and Pro-trial conversion counts');
 expect(shared.includes('navigator.share') && shared.includes('navigator.clipboard.writeText'), 'Referral sharing must support native share with clipboard fallback');
+expect(shared.includes("if (existing && triggerUserId === userId) return;"), 'Referral trigger rendering must be idempotent for the current signed-in user');
+expect(shared.includes("if (!host || !host.isConnected || host.parentElement !== mount) renderTrigger();"), 'Mutation observation must only remount a missing or displaced referral host');
+expect(!shared.includes('new MutationObserver(() => renderTrigger())'), 'Mutation observation must never blindly rerender the trigger on its own DOM writes');
 expect(!shared.includes('duration_days:'), 'Product clients must never choose a referral trial duration');
 expect(!shared.includes('trial_days:'), 'Product clients must never send a referral trial duration');
 
