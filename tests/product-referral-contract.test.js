@@ -44,6 +44,8 @@ expect(shared.includes("api('get_or_create')"), 'Signed-in users must receive th
 expect(shared.includes('joined_count') && shared.includes('trial_count'), 'Inviters must see joined and Pro-trial conversion counts');
 expect(shared.includes('navigator.share') && shared.includes('navigator.clipboard.writeText'), 'Referral sharing must support native share with clipboard fallback');
 expect(shared.includes('config.standaloneReferralTrigger === false'), 'Products with an existing share menu must be able to embed Invite without a duplicate standalone trigger');
+expect(shared.includes("sessionStorage.setItem(PENDING_OPEN_KEY, '1')"), 'Invite intent must survive the sign-in transition');
+expect(shared.includes('next && consumePendingOpen()'), 'A successful sign-in must resume the pending Invite exactly once');
 expect(shared.includes("if (existing && triggerUserId === userId) return;"), 'Referral trigger rendering must be idempotent for the current signed-in user');
 expect(shared.includes("if (!host || !host.isConnected || host.parentElement !== mount) renderTrigger();"), 'Mutation observation must only remount a missing or displaced referral host');
 expect(!shared.includes('new MutationObserver(() => renderTrigger())'), 'Mutation observation must never blindly rerender the trigger on its own DOM writes');
@@ -51,9 +53,13 @@ expect(!shared.includes('duration_days:'), 'Product clients must never choose a 
 expect(!shared.includes('trial_days:'), 'Product clients must never send a referral trial duration');
 
 expect(landing.includes("callReferral('preview')"), 'Referral onboarding must preview the server-authoritative offer before sign-in');
-expect(landing.includes("callReferral('redeem', {}, true)"), 'Referral onboarding must redeem only after authenticated confirmation');
+expect(landing.includes("callReferral('redeem')"), 'Referral onboarding must redeem only after authenticated confirmation');
 expect(landing.includes("const OAUTH_PROVIDERS = new Set(['google', 'github', 'x'])"), 'Referral onboarding must support Google, GitHub, and X');
 expect(landing.includes('signInWithOtp'), 'Referral onboarding must retain email magic-link sign-in');
+expect(landing.includes("query.get('ref') || hash.get('ref')"), 'Referral landing must recover referral context from auth query redirects and shared hash links');
+expect(landing.includes("url.searchParams.set('ref', referralCode)"), 'Auth redirects must carry the opaque referral code across browsers and devices');
+expect(landing.includes('redirectTo: referralAuthRedirectUrl()'), 'OAuth must return to the same referral context');
+expect(landing.includes('emailRedirectTo: referralAuthRedirectUrl()'), 'Magic links must return to the same referral context');
 expect(landing.includes('确认并激活邀请'), 'Referral redemption must require explicit account confirmation');
 expect(landing.includes('换一个账号'), 'Referral onboarding must allow account switching before redemption');
 expect(landing.includes('referral_landing_view') && landing.includes('referral_pro_activated'), 'Referral funnel telemetry must use the existing analytics path');
