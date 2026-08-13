@@ -192,7 +192,7 @@ begin
     v_trial_days,
     v_valid_until
   )
-  on conflict (product_code, invitee_user_id) do nothing
+  on conflict on constraint product_referral_attributions_invitee_unique do nothing
   returning id into v_inserted_id;
 
   if v_inserted_id is null then
