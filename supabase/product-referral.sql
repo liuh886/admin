@@ -20,6 +20,14 @@ create index if not exists product_referral_codes_product_idx
 alter table public.product_referral_codes enable row level security;
 revoke all on table public.product_referral_codes from anon, authenticated;
 
+drop policy if exists "Browser roles cannot read product referral codes" on public.product_referral_codes;
+create policy "Browser roles cannot read product referral codes"
+  on public.product_referral_codes
+  as restrictive
+  for select
+  to anon, authenticated
+  using (false);
+
 create table if not exists public.product_referral_attributions (
   id uuid primary key default pg_catalog.gen_random_uuid(),
   product_code text not null,
@@ -46,9 +54,21 @@ create table if not exists public.product_referral_attributions (
 
 create index if not exists product_referral_attributions_inviter_idx
   on public.product_referral_attributions (inviter_user_id, product_code, accepted_at desc);
+create index if not exists product_referral_attributions_code_idx
+  on public.product_referral_attributions (product_code, referral_code);
+create index if not exists product_referral_attributions_invitee_idx
+  on public.product_referral_attributions (invitee_user_id);
 
 alter table public.product_referral_attributions enable row level security;
 revoke all on table public.product_referral_attributions from anon, authenticated;
+
+drop policy if exists "Browser roles cannot read product referral attributions" on public.product_referral_attributions;
+create policy "Browser roles cannot read product referral attributions"
+  on public.product_referral_attributions
+  as restrictive
+  for select
+  to anon, authenticated
+  using (false);
 
 create or replace function public.redeem_product_referral(
   p_invitee_user_id uuid,
