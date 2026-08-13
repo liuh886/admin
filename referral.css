@@ -1,0 +1,230 @@
+.product-referral-mode main.shell {
+  display: none !important;
+}
+
+.product-referral-redemption {
+  min-height: 100dvh;
+  padding: 32px 18px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(99, 102, 241, .12), transparent 32%),
+    #f5f7fb;
+  color: #111827;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.referral-card {
+  width: min(620px, 100%);
+  padding: clamp(24px, 5vw, 44px);
+  border: 1px solid rgba(17, 24, 39, .1);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 28px 90px rgba(15, 23, 42, .12);
+}
+
+.referral-brand {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #111827;
+  color: white;
+  font-weight: 900;
+  font-size: 20px;
+}
+
+.referral-eyebrow {
+  margin: 22px 0 8px;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .15em;
+}
+
+.referral-card h1 {
+  margin: 0;
+  font-size: clamp(28px, 6vw, 44px);
+  line-height: 1.04;
+  letter-spacing: -.035em;
+}
+
+.referral-lead {
+  margin: 18px 0 22px;
+  color: #4b5563;
+  line-height: 1.7;
+}
+
+.referral-offer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.referral-product,
+.referral-benefit {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #f9fafb;
+}
+
+.referral-benefit.is-pro {
+  border-color: rgba(180, 132, 0, .3);
+  background: #fffaf0;
+}
+
+.referral-offer span,
+.referral-offer small {
+  color: #6b7280;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.referral-offer span {
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.referral-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+}
+
+.referral-provider-grid button,
+.referral-confirm-actions button,
+.referral-primary,
+.referral-open-product {
+  min-height: 48px;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  background: white;
+  color: #111827;
+  font: inherit;
+  cursor: pointer;
+}
+
+.referral-provider-grid button {
+  padding: 12px;
+  display: grid;
+  gap: 3px;
+  text-align: left;
+}
+
+.referral-provider-grid button span {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.referral-primary,
+.referral-open-product {
+  background: #111827 !important;
+  color: white !important;
+  border-color: #111827 !important;
+  font-weight: 750 !important;
+}
+
+.referral-divider {
+  position: relative;
+  margin: 20px 0;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.referral-divider::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.referral-divider span {
+  position: relative;
+  padding: 0 10px;
+  background: white;
+}
+
+.referral-email-form {
+  display: grid;
+  gap: 12px;
+}
+
+.referral-email-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.referral-email-form input {
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 0 13px;
+  font: inherit;
+}
+
+.referral-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.referral-open-product {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  margin-top: 22px;
+  padding: 0 18px;
+}
+
+.referral-status {
+  min-height: 20px;
+  margin: 12px 0 0;
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.referral-status[data-kind="error"] {
+  color: #b91c1c;
+}
+
+.referral-status[data-kind="success"] {
+  color: #047857;
+}
+
+.referral-footnote {
+  margin: 18px 0 0;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+@media (max-width: 620px) {
+  .product-referral-redemption {
+    align-items: end;
+    padding: 0;
+  }
+  .referral-card {
+    border-radius: 26px 26px 0 0;
+    padding: 26px 18px max(26px, env(safe-area-inset-bottom));
+  }
+  .referral-offer,
+  .referral-provider-grid,
+  .referral-confirm-actions {
+    grid-template-columns: 1fr;
+  }
+}
