@@ -1,10 +1,12 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-if (!document.querySelector('link[href="./feedback-admin.css"]')) {
-  const stylesheet = document.createElement('link');
-  stylesheet.rel = 'stylesheet';
-  stylesheet.href = './feedback-admin.css';
-  document.head.appendChild(stylesheet);
+for (const href of ['./feedback-admin.css', './buchikui-feedback-admin.css']) {
+  if (!document.querySelector(`link[href="${href}"]`)) {
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = href;
+    document.head.appendChild(stylesheet);
+  }
 }
 
 const config = Object.freeze({
@@ -25,6 +27,14 @@ const STATUS_LABELS = Object.freeze({
   closed: '已关闭'
 });
 
+const BUCHIKUI_STATUS_LABELS = Object.freeze({
+  new: '待审',
+  reviewing: '评审中',
+  planned: '已采纳 · 待改稿',
+  resolved: '已吸纳',
+  closed: '不采纳'
+});
+
 const CATEGORY_LABELS = Object.freeze({
   general: '一般反馈',
   idea: '功能建议',
@@ -33,12 +43,20 @@ const CATEGORY_LABELS = Object.freeze({
   other: '其他'
 });
 
+const BUCHIKUI_FEEDBACK_TYPES = Object.freeze({
+  experience: '亲身经历',
+  correction: '信息纠错',
+  process: '流程补充',
+  other: '其他'
+});
+
 const KNOWN_PRODUCTS = Object.freeze([
   ['alpha_engine', 'AlphaEngine'],
   ['ownly', 'Ownly'],
   ['newsflow', 'NewsFlow'],
   ['rhythmcoach', 'RhythmCoach'],
-  ['flappyk', 'FlappyK']
+  ['flappyk', 'FlappyK'],
+  ['buchikui', '不吃亏']
 ]);
 
 const state = {
@@ -80,6 +98,41 @@ function initials(item) {
 
 function productLabel(code) {
   return KNOWN_PRODUCTS.find(([value]) => value === code)?.[1] || code;
+}
+
+function isBuchikuiAnchored(item) {
+  return item?.product_code === 'buchikui'
+    && item?.metadata?.kind === 'anchored_consumer_experience';
+}
+
+function statusLabelsFor(item) {
+  return isBuchikuiAnchored(item) ? BUCHIKUI_STATUS_LABELS : STATUS_LABELS;
+}
+
+function categoryLabelFor(item) {
+  if (!isBuchikuiAnchored(item)) return CATEGORY_LABELS[item.category] || item.category;
+  return BUCHIKUI_FEEDBACK_TYPES[item.metadata?.feedback_type] || '消费者经验';
+}
+
+function renderAnchoredContext(item) {
+  if (!isBuchikuiAnchored(item)) return '';
+  const metadata = item.metadata || {};
+  const exact = metadata.target?.quote?.exact || '';
+  const anchor = metadata.anchor_label || metadata.anchor_key || '';
+  const caseId = metadata.case_id ? `CASE ${metadata.case_id}` : 'CASE';
+  const caseName = metadata.case_name || metadata.case_slug || '';
+  const caseUpdated = metadata.case_updated || '';
+  const type = BUCHIKUI_FEEDBACK_TYPES[metadata.feedback_type] || '消费者经验';
+  return `
+    <section class="feedback-context-card" aria-label="不吃亏段落上下文">
+      <div class="feedback-context-meta">
+        <strong>${escapeHtml(caseId)}${caseName ? ` · ${escapeHtml(caseName)}` : ''}</strong>
+        ${caseUpdated ? `<span>正文版本 ${escapeHtml(caseUpdated)}</span>` : ''}
+        <span class="feedback-context-kind">${escapeHtml(type)}</span>
+      </div>
+      ${anchor ? `<code class="feedback-context-anchor">${escapeHtml(metadata.anchor_key || anchor)}${metadata.anchor_label && metadata.anchor_label !== metadata.anchor_key ? ` · ${escapeHtml(metadata.anchor_label)}` : ''}</code>` : ''}
+      ${exact ? `<blockquote>“${escapeHtml(exact)}”</blockquote>` : ''}
+    </section>`;
 }
 
 function injectSection() {
@@ -229,6 +282,10 @@ function renderFeedback() {
     const avatar = safeUrl(item.avatar_url);
     const identity = item.display_name || item.user_email || item.user_id;
     const secondary = item.user_email && item.display_name ? item.user_email : item.user_id;
+    const statusLabels = statusLabelsFor(item);
+    const notePlaceholder = isBuchikuiAnchored(item)
+      ? '记录判断；吸纳后可写对应 PR / commit 或关闭原因'
+      : '记录判断、后续动作或关闭原因';
     return `
       <article class="feedback-card" data-feedback-id="${escapeHtml(item.id)}">
         <header class="feedback-card-header">
@@ -244,21 +301,23 @@ function renderFeedback() {
           </div>
           <div class="feedback-badges">
             <span class="feedback-badge">${escapeHtml(productLabel(item.product_code))}</span>
-            <span class="feedback-badge">${escapeHtml(CATEGORY_LABELS[item.category] || item.category)}</span>
-            <span class="feedback-badge" data-status="${escapeHtml(item.status)}">${escapeHtml(STATUS_LABELS[item.status] || item.status)}</span>
+            <span class="feedback-badge">${escapeHtml(categoryLabelFor(item))}</span>
+            <span class="feedback-badge" data-status="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status] || item.status)}</span>
           </div>
         </header>
         <div class="feedback-card-body">
+          ${renderAnchoredContext(item)}
+          ${isBuchikuiAnchored(item) ? '<span class="feedback-message-label">消费者补充</span>' : ''}
           <p class="feedback-message">${escapeHtml(item.message)}</p>
           ${source ? `<a class="feedback-source" href="${escapeHtml(source)}" target="_blank" rel="noreferrer">来源页面：${escapeHtml(source)}</a>` : ''}
         </div>
         <div class="feedback-operations">
           <label><span>处理状态</span>
             <select data-feedback-status ${canUpdate ? '' : 'disabled'}>
-              ${Object.entries(STATUS_LABELS).map(([value, label]) => `<option value="${value}" ${item.status === value ? 'selected' : ''}>${label}</option>`).join('')}
+              ${Object.entries(statusLabels).map(([value, label]) => `<option value="${value}" ${item.status === value ? 'selected' : ''}>${label}</option>`).join('')}
             </select>
           </label>
-          <label><span>内部备注</span><textarea data-feedback-note maxlength="2000" ${canUpdate ? '' : 'disabled'} placeholder="记录判断、后续动作或关闭原因">${escapeHtml(item.admin_note || '')}</textarea></label>
+          <label><span>内部备注</span><textarea data-feedback-note maxlength="2000" ${canUpdate ? '' : 'disabled'} placeholder="${escapeHtml(notePlaceholder)}">${escapeHtml(item.admin_note || '')}</textarea></label>
           <button class="button primary compact" type="button" data-feedback-save ${canUpdate ? '' : 'disabled'}>保存处理</button>
         </div>
       </article>`;
