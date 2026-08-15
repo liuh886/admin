@@ -1,0 +1,77 @@
+name: Buchikui Feedback Admin QA
+
+on:
+  push:
+    branches: [agent/buchikui-feedback-review]
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check JavaScript syntax
+        run: node --check feedback-admin.js
+
+      - name: Render anchored feedback fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('feedback-admin.js')
+          s=p.read_text()
+          s=s.replace("import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';", "import { createClient } from './qa-supabase.js';")
+          p.write_text(s)
+          Path('qa-supabase.js').write_text('''export function createClient(){return{auth:{async getSession(){return{data:{session:{access_token:"qa-token"}},error:null}},onAuthStateChange(){return{data:{subscription:{unsubscribe(){}}}}}}}}''')
+          Path('qa-fixture.html').write_text('''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="admin.css"></head><body><main id="console"><section class="recent-section"></section></main><script>
+          const nativeFetch=window.fetch.bind(window);
+          window.fetch=async(url,options)=>{
+            if(String(url).includes('/functions/v1/feedback-admin')){
+              return new Response(JSON.stringify({
+                actor:{id:'00000000-0000-4000-8000-000000000099',role:'owner'},
+                feedback:[{
+                  id:'00000000-0000-4000-8000-000000000101',user_id:'00000000-0000-4000-8000-000000000001',
+                  product_code:'buchikui',category:'content',message:'我实际遇到过类似情况，平台最后是在工单里补充了书面依据。',
+                  page_url:'https://liuh886.github.io/buchikui/?case=rental',status:'planned',admin_note:'准备吸收到下一版 CASE。',
+                  created_at:'2026-08-15T08:00:00Z',updated_at:'2026-08-15T08:00:00Z',reviewed_at:null,reviewed_by:null,
+                  display_name:'QA Consumer',user_email:'qa@example.com',avatar_url:null,
+                  metadata:{schema_version:1,kind:'anchored_consumer_experience',feedback_type:'experience',case_id:'001',case_slug:'rental',case_name:'如何租车维权',case_updated:'2026-08-15',anchor_key:'scenario.信用免押被扣.action',anchor_label:'信用免押被扣 · 现在做什么',target:{quote:{type:'TextQuoteSelector',exact:'平台提出索赔，并不等于平台当然有直接划款权。',prefix:'',suffix:''},position:{type:'TextPositionSelector',start:0,end:23},block_text_sha256:'abc'}}
+                }],
+                products:['buchikui'],counts:{new:0,reviewing:0,planned:1,resolved:0,closed:0},total:1,next_cursor:null
+              }),{status:200,headers:{'Content-Type':'application/json'}});
+            }
+            return nativeFetch(url,options);
+          };
+          </script><script type="module" src="./feedback-admin.js"></script><script>setTimeout(()=>{document.body.dataset.qaOverflow=String(document.documentElement.scrollWidth>document.documentElement.clientWidth)},900)</script></body></html>''')
+          PY
+
+          python3 -m http.server 4173 >/tmp/admin-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+          sleep 1
+          URL='http://127.0.0.1:4173/qa-fixture.html'
+          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=1800 --window-size=1440,1200 --screenshot=/tmp/buchikui-admin.png "$URL"
+          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=1800 --window-size=1440,1200 --dump-dom "$URL" >/tmp/buchikui-admin.html
+
+          grep -q 'data-qa-overflow="false"' /tmp/buchikui-admin.html
+          grep -q '不吃亏' /tmp/buchikui-admin.html
+          grep -q '亲身经历' /tmp/buchikui-admin.html
+          grep -q '平台提出索赔，并不等于平台当然有直接划款权' /tmp/buchikui-admin.html
+          grep -q '已采纳 · 待改稿' /tmp/buchikui-admin.html
+          grep -q 'scenario.信用免押被扣.action' /tmp/buchikui-admin.html
+
+      - name: Upload QA evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: buchikui-feedback-admin-qa
+          path: |
+            /tmp/buchikui-admin.png
+            /tmp/buchikui-admin.html
