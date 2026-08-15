@@ -1,0 +1,7 @@
+.feedback-context-card{margin:0 0 16px;padding:14px 16px;border-left:3px solid #d4a900;background:rgba(244,207,74,.12)}
+.feedback-context-meta{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-bottom:8px;color:var(--muted,#667085);font-size:12px}
+.feedback-context-meta strong{color:var(--text,#101828);font-size:12px}
+.feedback-context-anchor{display:block;margin:0 0 8px;color:var(--muted,#667085);font:600 11px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all}
+.feedback-context-card blockquote{margin:0;padding:10px 12px;background:rgba(255,255,255,.72);border:0;color:var(--text,#101828);font-size:14px;line-height:1.6}
+.feedback-context-kind{font-weight:700;color:var(--text,#101828)}
+.feedback-message-label{display:block;margin:0 0 5px;color:var(--muted,#667085);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
