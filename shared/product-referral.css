@@ -1,33 +1,60 @@
+:root {
+  --hao-referral-control-height: 36px;
+  --hao-referral-control-radius: 10px;
+  --hao-referral-control-padding: 0 10px;
+  --hao-referral-control-border: color-mix(in srgb, currentColor 13%, transparent);
+  --hao-referral-control-background: transparent;
+  --hao-referral-control-hover-background: color-mix(in srgb, currentColor 6%, transparent);
+  --hao-referral-control-focus: color-mix(in srgb, currentColor 34%, transparent);
+}
+
 .hao-referral-mount {
   display: inline-flex;
   align-items: center;
+  color: inherit;
+  font: inherit;
 }
 
 .hao-referral-trigger {
   appearance: none;
-  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
-  background: color-mix(in srgb, Canvas 96%, transparent);
-  color: inherit;
-  border-radius: 10px;
-  min-height: 34px;
-  padding: 0 11px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
+  min-height: var(--hao-referral-control-height);
+  padding: var(--hao-referral-control-padding);
+  border: 1px solid var(--hao-referral-control-border);
+  border-radius: var(--hao-referral-control-radius);
+  background: var(--hao-referral-control-background);
+  color: inherit;
+  box-shadow: none;
   font: inherit;
   font-size: 12px;
   font-weight: 650;
+  line-height: 1;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
 }
 
 .hao-referral-trigger:hover {
-  border-color: color-mix(in srgb, currentColor 28%, transparent);
-  background: color-mix(in srgb, currentColor 5%, Canvas);
+  border-color: color-mix(in srgb, currentColor 24%, transparent);
+  background: var(--hao-referral-control-hover-background);
 }
 
-.hao-referral-trigger:active {
-  transform: translateY(1px);
+.hao-referral-trigger:focus-visible {
+  outline: 3px solid var(--hao-referral-control-focus);
+  outline-offset: 2px;
+}
+
+.hao-referral-trigger svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .hao-referral-overlay[hidden] {
@@ -91,6 +118,14 @@
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
+}
+
+.hao-referral-close:focus-visible,
+.hao-referral-link button:focus-visible,
+.hao-referral-status button:focus-visible,
+.hao-referral-share:focus-visible {
+  outline: 3px solid color-mix(in srgb, currentColor 24%, transparent);
+  outline-offset: 2px;
 }
 
 .hao-referral-benefit {
@@ -258,6 +293,12 @@
   .hao-referral-loading span {
     transition: none;
     animation: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .hao-referral-trigger {
+    min-height: max(44px, var(--hao-referral-control-height));
   }
 }
 
