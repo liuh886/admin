@@ -29,6 +29,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git restore .github/workflows/pages.yml
+          git add shared/account-shell.js shared/account-shell.css shared/README.md tests/account-shell-contract.test.js tests/e2e/account-shell.spec.js tests/fixtures/account-shell.html
+          git add -u shared/account-upgrade.js shared/account-upgrade.css
           git commit -m "refactor: make account shell the single shared UI owner"
           git push origin HEAD:refactor/account-shell-canonical
