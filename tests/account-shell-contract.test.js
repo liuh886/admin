@@ -1,11 +1,10 @@
 import fs from 'node:fs';
 
 const script = fs.readFileSync('shared/account-shell.js', 'utf8');
-const upgrade = fs.readFileSync('shared/account-upgrade.js', 'utf8');
 const css = fs.readFileSync('shared/account-shell.css', 'utf8');
 const portal = fs.readFileSync('supabase/functions/create-portal-session/index.ts', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/0006_shared_product_account_foundation.sql', 'utf8');
-const browser = `${script}\n${upgrade}\n${css}`;
+const browser = `${script}\n${css}`;
 
 function expect(condition, message) {
   if (!condition) throw new Error(message);
@@ -19,7 +18,6 @@ for (const required of [
   "from('product_feedback')",
   "from('entitlements')",
   'hao:account-changed',
-  'hao:membership-changed',
   'saveProductData',
   'submitFeedback',
   'function findMount()',
@@ -72,17 +70,18 @@ expect(script.includes("accessUntil: 'Cancellation scheduled · Pro access throu
 expect(script.includes('function subscriptionSummary(t)'), 'Account shell must render subscription lifecycle state');
 
 for (const required of [
-  'function removeInternalCapabilities(dialog)',
+  'function enhanceUpgrade(dialog, snapshotValue)',
   "dialog.querySelector('.hao-account-feature-panel')?.remove()",
-  'function ensureProManagement(dialog, snapshot)',
-  'if (!snapshot?.isPro || snapshot.subscription) return',
-  'if (!snapshot?.isPro || !snapshot.subscription) return',
-  "manage: '管理订阅'",
-  "manage: 'Manage subscription'",
-  'config.portalFunctionUrl',
+  'function resumeUpgradeIntent(snapshotValue)',
+  "sessionStorage.setItem(upgradeIntentKey, '1')",
+  "localized(upgrade.ctaTitle, formatText(t.checkout))",
+  "snapshotValue?.subscription?.status === 'trialing'",
 ]) {
-  expect(upgrade.includes(required), `Shared Pro account upgrade is missing ${required}`);
+  expect(script.includes(required), `Canonical account shell is missing integrated Pro upgrade behavior: ${required}`);
 }
+expect(!script.includes('hao:membership-changed'), 'Retired membership compatibility event must not return');
+expect((script.match(/new MutationObserver/g) || []).length === 1, 'Account shell may only observe DOM while waiting for its mount');
+expect(script.includes('mountObserver?.disconnect();'), 'Mount observer must disconnect after the account slot appears');
 
 for (const required of [
   'billing_customers',
