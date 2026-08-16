@@ -3,9 +3,9 @@
 Public browser assets:
 
 ```html
-<link rel="stylesheet" href="https://liuh886.github.io/admin/shared/account-shell.css?v=1">
+<link rel="stylesheet" href="https://liuh886.github.io/admin/shared/account-shell.css?v=6">
 <script src="./account-config.js"></script>
-<script src="https://liuh886.github.io/admin/shared/account-shell.js?v=1"></script>
+<script src="https://liuh886.github.io/admin/shared/account-shell.js?v=7"></script>
 ```
 
 Deploy the shared `admin` assets before merging a product integration. The version query is part of the rollout contract and should be incremented only when a browser-incompatible shell change requires a coordinated product update.
@@ -46,7 +46,7 @@ window.HaoAccountConfig = Object.freeze({
 - `submitFeedback(category, message)`
 - `subscribe(listener)`
 
-The shell emits both `hao:account-changed` and the compatibility event `hao:membership-changed`.
+The shell emits `hao:account-changed` as the single account-state event.
 
 ## Data boundary
 
@@ -60,3 +60,6 @@ The shared browser client may write only:
 Do not upload content through `product_accounts`. Product content that genuinely needs cloud sync must use an app-specific RLS table with an explicit product contract. RhythmCoach follows this rule: only Personal Library **text materials** may sync through `rhythmcoach_personal_materials`; RhythmCoach audio recordings are always local-only and are never uploaded or stored online. Ownly Markdown and AlphaEngine local research bundles remain local-first unless their products explicitly define a separate RLS-backed cloud feature.
 
 Never place Stripe secrets, webhook secrets, Supabase secret/service-role keys, database passwords or Google service-account credentials in product configuration or browser assets.
+
+
+When `billingEnabled` and `proUpgrade` are configured, Free/Pro comparison and checkout guidance are rendered directly by `account-shell`; there is no second upgrade runtime.

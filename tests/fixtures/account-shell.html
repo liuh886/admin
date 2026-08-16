@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="/shared/account-shell.css">
+</head>
+<body>
+  <header><div data-account-slot></div></header>
+  <main id="app"></main>
+  <script>
+    window.HaoAccountConfig = Object.freeze({
+      enabled: true,
+      billingEnabled: true,
+      appName: 'Fixture',
+      productCode: 'fixture',
+      entitlementCode: 'fixture.pro',
+      supabaseUrl: 'https://fixture.supabase.co',
+      supabasePublishableKey: 'sb_publishable_fixture',
+      checkoutFunctionUrl: 'https://fixture.supabase.co/functions/v1/create-checkout-session',
+      portalFunctionUrl: 'https://fixture.supabase.co/functions/v1/create-portal-session',
+      mountSelectors: ['[data-account-slot]'],
+      proUpgrade: {
+        title: { en: 'Free and Fixture Pro' },
+        freeTitle: { en: 'Core stays free' },
+        freeFeatures: [{ en: 'Use the core product' }],
+        proTitle: { en: 'Fixture Pro' },
+        proFeatures: [{ en: 'Unlock Pro capability' }],
+        checkoutDescription: { en: 'Upgrade without reducing Free access.' },
+        ctaTitle: { en: 'Upgrade to Fixture Pro' }
+      }
+    });
+  </script>
+  <script src="/shared/account-shell.js"></script>
+</body>
+</html>
