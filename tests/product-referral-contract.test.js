@@ -55,6 +55,10 @@ expect(!shared.includes('if (!host || !host.isConnected || host.parentElement !=
 expect(!shared.includes('new MutationObserver(() => renderTrigger())'), 'Mutation observation must never blindly rerender the trigger on its own DOM writes');
 expect(!shared.includes('duration_days:'), 'Product clients must never choose a referral trial duration');
 expect(!shared.includes('trial_days:'), 'Product clients must never send a referral trial duration');
+expect(shared.includes('符合条件的新用户可通过它获得 Pro 体验'), 'Free inviter copy must describe the user benefit without exposing control-plane details');
+for (const forbiddenCopy of ['Admin 当时设置', 'Admin-configured', 'redemption time']) {
+  expect(!shared.includes(forbiddenCopy), `Shared referral UI must not expose internal policy language: ${forbiddenCopy}`);
+}
 
 expect(landing.includes("callReferral('preview')"), 'Referral onboarding must preview the server-authoritative offer before sign-in');
 expect(landing.includes("callReferral('redeem')"), 'Referral onboarding must redeem only after authenticated confirmation');
