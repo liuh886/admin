@@ -47,7 +47,11 @@ expect(shared.includes('config.standaloneReferralTrigger === false'), 'Products 
 expect(shared.includes("sessionStorage.setItem(PENDING_OPEN_KEY, '1')"), 'Invite intent must survive the sign-in transition');
 expect(shared.includes('next && consumePendingOpen()'), 'A successful sign-in must resume the pending Invite exactly once');
 expect(shared.includes("if (existing && triggerUserId === userId) return;"), 'Referral trigger rendering must be idempotent for the current signed-in user');
-expect(shared.includes("if (!host || !host.isConnected || host.parentElement !== mount) renderTrigger();"), 'Mutation observation must only remount a missing or displaced referral host');
+expect(shared.includes('function observeInitialMount') || shared.includes('const observeInitialMount ='), 'Referral may observe only while waiting for its initial mount');
+expect(shared.includes('if (ensureHost()) return;'), 'Referral must skip DOM observation when the product mount already exists');
+expect(shared.includes('mountObserver?.disconnect();'), 'Referral mount observation must disconnect after the product slot appears');
+expect((shared.match(/new MutationObserver/g) || []).length === 1, 'Referral may have only one bounded mount observer');
+expect(!shared.includes('if (!host || !host.isConnected || host.parentElement !== mount) renderTrigger();'), 'Referral must not continuously remount itself after product DOM changes');
 expect(!shared.includes('new MutationObserver(() => renderTrigger())'), 'Mutation observation must never blindly rerender the trigger on its own DOM writes');
 expect(!shared.includes('duration_days:'), 'Product clients must never choose a referral trial duration');
 expect(!shared.includes('trial_days:'), 'Product clients must never send a referral trial duration');
