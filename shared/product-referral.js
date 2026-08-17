@@ -17,6 +17,7 @@
   let host = null;
   let overlay = null;
   let unsubscribe = null;
+  let mountObserver = null;
   let resetCopiedTimer = 0;
   let triggerUserId = '';
 
@@ -126,6 +127,20 @@
     }
     if (host.parentElement !== mount) mount.appendChild(host);
     return host;
+  };
+
+  const observeInitialMount = () => {
+    if (config.standaloneReferralTrigger === false) return;
+    mountObserver?.disconnect();
+    mountObserver = null;
+    if (ensureHost()) return;
+    mountObserver = new MutationObserver(() => {
+      if (!ensureHost()) return;
+      mountObserver?.disconnect();
+      mountObserver = null;
+      renderTrigger();
+    });
+    mountObserver.observe(document.documentElement, { childList: true, subtree: true });
   };
 
   const ensureOverlay = () => {
@@ -337,13 +352,7 @@
     if (event.key === 'Escape' && state.open) close();
   });
   window.addEventListener('hao:account-changed', (event) => hydrate(event.detail));
-  const observer = new MutationObserver(() => {
-    if (config.standaloneReferralTrigger === false) return;
-    const mount = findMount();
-    if (!mount) return;
-    if (!host || !host.isConnected || host.parentElement !== mount) renderTrigger();
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  observeInitialMount();
 
   if (!start()) {
     let attempts = 0;
