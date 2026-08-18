@@ -80,6 +80,9 @@ test('User 360 opens a recent user in the existing member workspace', async ({ p
   });
 
   await page.goto('/');
+  await page.waitForTimeout(300);
+  console.log(`Admin auth status: ${await page.locator('#auth-status').textContent()}`);
+  await expect(page.locator('#console')).toBeVisible();
   await expect(page.locator('#user-360-title')).toBeVisible();
   const row = page.locator('#user-360-list button[data-user-id="user-1"]');
   await expect(row).toContainText('Example User');
