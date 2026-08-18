@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'http://127.0.0.1:4173',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+};
+
 test('User 360 opens a recent user in the existing member workspace', async ({ page }) => {
   await page.route('https://cdn.jsdelivr.net/**', (route) => route.fulfill({
     contentType: 'application/javascript',
@@ -22,6 +28,10 @@ test('User 360 opens a recent user in the existing member workspace', async ({ p
   }));
 
   await page.route('https://blgwlycfcwvsupmqyqwn.supabase.co/functions/v1/**', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
+
     const url = route.request().url();
     const body = JSON.parse(route.request().postData() || '{}');
 
@@ -29,6 +39,7 @@ test('User 360 opens a recent user in the existing member workspace', async ({ p
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: corsHeaders,
         body: JSON.stringify({
           actor: { id: 'admin-1', email: 'owner@example.com', role: 'owner' },
           products: [],
@@ -54,6 +65,7 @@ test('User 360 opens a recent user in the existing member workspace', async ({ p
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: corsHeaders,
         body: JSON.stringify({
           user: {
             id: 'user-1',
@@ -75,13 +87,12 @@ test('User 360 opens a recent user in the existing member workspace', async ({ p
     return route.fulfill({
       status: 503,
       contentType: 'application/json',
+      headers: corsHeaders,
       body: JSON.stringify({ error: 'not used in this acceptance path' })
     });
   });
 
   await page.goto('/');
-  await page.waitForTimeout(300);
-  console.log(`Admin auth status: ${await page.locator('#auth-status').textContent()}`);
   await expect(page.locator('#console')).toBeVisible();
   await expect(page.locator('#user-360-title')).toBeVisible();
   const row = page.locator('#user-360-list button[data-user-id="user-1"]');
