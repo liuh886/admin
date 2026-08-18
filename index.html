@@ -200,19 +200,25 @@
         </div>
       </section>
 
-      <section class="search-panel">
-        <div>
-          <p class="eyebrow">MEMBER LOOKUP</p>
-          <h2>查找会员</h2>
-          <p>用户需要至少完成过一次 Supabase 登录。</p>
+      <section class="search-panel user-360-panel" aria-labelledby="user-360-title">
+        <div class="user-360-heading">
+          <div>
+            <p class="eyebrow">USER 360</p>
+            <h2 id="user-360-title">用户</h2>
+            <p>先从最近活跃用户进入；已知邮箱仍可精确检索。详情继续使用同一会员档案。</p>
+          </div>
+          <form id="member-search" class="search-form">
+            <label>
+              <span>邮箱地址</span>
+              <input id="search-email" type="email" autocomplete="off" placeholder="user@example.com" required>
+            </label>
+            <button class="button primary" type="submit">打开用户档案</button>
+          </form>
         </div>
-        <form id="member-search" class="search-form">
-          <label>
-            <span>邮箱地址</span>
-            <input id="search-email" type="email" autocomplete="off" placeholder="user@example.com" required>
-          </label>
-          <button class="button primary" type="submit">打开会员档案</button>
-        </form>
+        <div class="user-360-list-wrap">
+          <div class="user-360-list-head"><strong>最近用户</strong><span id="user-360-note">最近 50 个账户</span></div>
+          <div id="user-360-list" class="user-360-list"><p class="empty-copy">正在载入用户…</p></div>
+        </div>
       </section>
 
       <p id="console-status" class="status-line console-status" role="status" aria-live="polite"></p>

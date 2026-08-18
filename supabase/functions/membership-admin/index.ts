@@ -264,14 +264,67 @@ Deno.serve(async (req: Request) => {
     };
   };
 
+  const loadUserSummaries = async () => {
+    const { data: authUsers, error: authUsersError } = await admin.auth.admin.listUsers({ page: 1, perPage: 50 });
+    if (authUsersError) throw authUsersError;
+    const users = authUsers.users ?? [];
+    const ids = users.map((user) => user.id);
+    if (!ids.length) return { total: authUsers.total ?? 0, users: [] };
+
+    const [profilesResult, accountsResult, entitlementsResult, subscriptionsResult] = await Promise.all([
+      admin.from("profiles").select("id,display_name,updated_at").in("id", ids),
+      admin.from("product_accounts").select("user_id,product_code,last_seen_at").in("user_id", ids),
+      admin.from("entitlements").select("user_id,entitlement_code,active,valid_until").in("user_id", ids),
+      admin.from("subscriptions").select("user_id,product_code,status,current_period_end").in("user_id", ids),
+    ]);
+    for (const result of [profilesResult, accountsResult, entitlementsResult, subscriptionsResult]) {
+      if (result.error) throw result.error;
+    }
+
+    const profiles = new Map((profilesResult.data ?? []).map((row) => [row.id, row]));
+    const accounts = accountsResult.data ?? [];
+    const entitlements = entitlementsResult.data ?? [];
+    const subscriptions = subscriptionsResult.data ?? [];
+    const now = Date.now();
+    const activeSubscriptionStatuses = new Set(["active", "trialing", "past_due"]);
+
+    const summaries = users.map((user) => {
+      const userAccounts = accounts.filter((row) => row.user_id === user.id);
+      const userEntitlements = entitlements.filter((row) => {
+        if (row.user_id !== user.id || !row.active) return false;
+        const validUntil = row.valid_until ? new Date(row.valid_until).getTime() : null;
+        return !validUntil || validUntil > now;
+      });
+      const userSubscriptions = subscriptions.filter((row) => row.user_id === user.id && activeSubscriptionStatuses.has(String(row.status)));
+      const lastActivity = userAccounts
+        .map((row) => row.last_seen_at)
+        .filter(Boolean)
+        .sort()
+        .at(-1) ?? null;
+      return {
+        id: user.id,
+        email: user.email ?? null,
+        display_name: profiles.get(user.id)?.display_name ?? null,
+        created_at: user.created_at,
+        last_sign_in_at: user.last_sign_in_at,
+        last_activity_at: lastActivity,
+        products: [...new Set(userAccounts.map((row) => row.product_code).filter(Boolean))].sort(),
+        active_entitlements: userEntitlements.length,
+        active_subscriptions: userSubscriptions.length,
+      };
+    });
+    summaries.sort((a, b) => String(b.last_activity_at ?? b.last_sign_in_at ?? b.created_at ?? "").localeCompare(String(a.last_activity_at ?? a.last_sign_in_at ?? a.created_at ?? "")));
+    return { total: authUsers.total ?? users.length, users: summaries };
+  };
+
   try {
     if (MUTATING_ACTIONS.has(action)) await requireAal2();
 
     if (action === "bootstrap") {
-      const [{ data: products }, { data: mappings }, userCount, subscriptionCount, grantCount, actionCount, { data: recentActions }] = await Promise.all([
+      const [{ data: products }, { data: mappings }, userOverview, subscriptionCount, grantCount, actionCount, { data: recentActions }] = await Promise.all([
         admin.from("billing_products").select("product_code,name,app_url,active").eq("active", true).order("name"),
         admin.from("billing_product_entitlements").select("product_code,entitlement_code").order("product_code"),
-        admin.auth.admin.listUsers({ page: 1, perPage: 1 }),
+        loadUserSummaries(),
         admin.from("subscriptions").select("id", { count: "exact", head: true }).in("status", ["active", "trialing", "past_due"]),
         admin.from("entitlement_grants").select("source_ref", { count: "exact", head: true }).eq("active", true),
         admin.from("membership_admin_actions").select("id", { count: "exact", head: true }),
@@ -282,12 +335,13 @@ Deno.serve(async (req: Request) => {
         products: products ?? [],
         mappings: mappings ?? [],
         counts: {
-          users: userCount.data?.total ?? 0,
+          users: userOverview.total,
           active_subscriptions: subscriptionCount.count ?? 0,
           active_grants: grantCount.count ?? 0,
           admin_actions: actionCount.count ?? 0,
         },
         recent_actions: recentActions ?? [],
+        users: userOverview.users,
       });
     }
 

@@ -298,3 +298,26 @@ input:focus, select:focus { border-color: rgba(214, 255, 89, .7); box-shadow: 0 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+
+/* User 360 */
+.user-360-panel { display: grid; gap: 22px; }
+.user-360-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 440px); gap: 24px; align-items: end; }
+.user-360-list-wrap { min-width: 0; }
+.user-360-list-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 10px; color: var(--muted); font-size: .82rem; }
+.user-360-list { display: grid; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: rgba(255,255,255,.02); }
+.user-summary { appearance: none; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: inherit; display: grid; grid-template-columns: minmax(180px, 1.35fr) minmax(150px, 1fr) minmax(130px, .8fr) minmax(120px, .65fr); gap: 16px; align-items: center; width: 100%; padding: 14px 16px; text-align: left; cursor: pointer; }
+.user-summary:last-child { border-bottom: 0; }
+.user-summary:hover, .user-summary:focus-visible { background: rgba(255,255,255,.055); outline: none; }
+.user-summary-identity { min-width: 0; display: grid; gap: 3px; }
+.user-summary-identity strong, .user-summary-identity small, .user-summary-products { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-summary-identity small, .user-summary-products, .user-summary-time { color: var(--muted); }
+.user-summary-metrics { white-space: nowrap; font-size: .86rem; }
+.user-summary-time { white-space: nowrap; font-size: .8rem; text-align: right; }
+@media (max-width: 800px) {
+  .user-360-heading { grid-template-columns: 1fr; align-items: stretch; }
+  .user-summary { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; }
+  .user-summary-products { grid-column: 1 / -1; }
+  .user-summary-metrics { grid-column: 1; }
+  .user-summary-time { grid-column: 2; grid-row: 1; }
+}
