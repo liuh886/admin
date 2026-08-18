@@ -29,6 +29,7 @@ const els = {
   statUsers: $('#stat-users'), statSubscriptions: $('#stat-subscriptions'),
   statGrants: $('#stat-grants'), statActions: $('#stat-actions'),
   searchForm: $('#member-search'), searchEmail: $('#search-email'),
+  userList: $('#user-360-list'), userNote: $('#user-360-note'),
   emptyWorkspace: $('#empty-workspace'), memberWorkspace: $('#member-workspace'),
   memberEmail: $('#member-email'), memberMeta: $('#member-meta'), memberTier: $('#member-tier'),
   giftForm: $('#gift-form'), giftProduct: $('#gift-product'), giftDuration: $('#gift-duration'),
@@ -276,6 +277,23 @@ function showConsole() {
   els.console.hidden = false;
 }
 
+function renderUserSummaries(users) {
+  if (!els.userList) return;
+  const rows = Array.isArray(users) ? users : [];
+  if (els.userNote) els.userNote.textContent = rows.length ? `最近 ${rows.length} 个账户` : '暂无账户';
+  els.userList.innerHTML = rows.length ? rows.map((user) => {
+    const products = (user.products || []).length ? user.products.join(' · ') : '尚无产品活动';
+    const activity = user.last_activity_at || user.last_sign_in_at || user.created_at;
+    return `
+      <button class="user-summary" type="button" data-user-id="${escapeHtml(user.id)}">
+        <span class="user-summary-identity"><strong>${escapeHtml(user.display_name || user.email || user.id)}</strong><small>${escapeHtml(user.email || user.id)}</small></span>
+        <span class="user-summary-products">${escapeHtml(products)}</span>
+        <span class="user-summary-metrics"><b>${escapeHtml(String(user.active_entitlements || 0))}</b> 权益 · <b>${escapeHtml(String(user.active_subscriptions || 0))}</b> 订阅</span>
+        <span class="user-summary-time">${escapeHtml(formatDate(activity))}</span>
+      </button>`;
+  }).join('') : '<p class="empty-copy">还没有可显示的 Supabase 用户。</p>';
+}
+
 function renderBootstrap() {
   const data = state.bootstrap;
   if (!data) return;
@@ -285,6 +303,7 @@ function renderBootstrap() {
   els.statSubscriptions.textContent = data.counts.active_subscriptions;
   els.statGrants.textContent = data.counts.active_grants;
   els.statActions.textContent = data.counts.admin_actions;
+  renderUserSummaries(data.users || []);
   els.giftProduct.innerHTML = [
     '<option value="all">全部产品 · Hao Apps</option>',
     ...(data.products || []).map((product) => `<option value="${escapeHtml(product.product_code)}">${escapeHtml(product.name)}</option>`)
@@ -454,13 +473,30 @@ els.signOut.addEventListener('click', async () => {
   showGate('已退出管理员账户。', 'success');
 });
 
+async function openMember(criteria) {
+  state.member = await callAdmin('search_user', criteria);
+  renderMember();
+  setStatus(els.consoleStatus, `已打开 ${state.member.user.email || state.member.user.id}。`, 'success');
+}
+
 els.searchForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   setBusy(true, '正在检索用户与 Stripe 记录…');
   try {
-    state.member = await callAdmin('search_user', { email: els.searchEmail.value.trim() });
-    renderMember();
-    setStatus(els.consoleStatus, `已打开 ${state.member.user.email}。`, 'success');
+    await openMember({ email: els.searchEmail.value.trim() });
+  } catch (error) {
+    setStatus(els.consoleStatus, error.message, 'error');
+  } finally {
+    setBusy(false);
+  }
+});
+
+els.userList?.addEventListener('click', async (event) => {
+  const button = event.target.closest('button[data-user-id]');
+  if (!button) return;
+  setBusy(true, '正在打开用户档案…');
+  try {
+    await openMember({ user_id: button.dataset.userId });
   } catch (error) {
     setStatus(els.consoleStatus, error.message, 'error');
   } finally {

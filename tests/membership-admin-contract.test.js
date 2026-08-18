@@ -27,6 +27,16 @@ expect(script.includes("data.currentLevel === 'aal2'"), 'Admin console must requ
 expect(edge.includes('MUTATING_ACTIONS'), 'Membership Edge Function must classify privileged mutations');
 expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Membership Edge Function must independently verify AAL2');
 expect(edge.includes('data.currentLevel !== "aal2"'), 'Membership mutations must fail closed below AAL2');
+expect(html.includes('id="user-360-list"'), 'User 360 recent-user list must be present');
+expect(html.includes('id="member-search"'), 'User 360 must retain exact email search');
+expect(script.includes('function renderUserSummaries(users)'), 'User 360 summaries must have one renderer');
+expect(script.includes("await openMember({ user_id: button.dataset.userId })"), 'User 360 rows must reuse the existing member detail loader');
+expect(edge.includes('const loadUserSummaries = async () =>'), 'Membership backend must own User 360 summary assembly');
+expect(edge.includes('listUsers({ page: 1, perPage: 50 })'), 'User 360 must keep the initial Auth listing bounded');
+expect(edge.includes('.from("product_accounts").select("user_id,product_code,last_seen_at")'), 'User 360 must use canonical product activity');
+expect(edge.includes('.from("entitlements").select("user_id,entitlement_code,active,valid_until")'), 'User 360 must summarize canonical entitlements');
+expect(edge.includes('.from("subscriptions").select("user_id,product_code,status,current_period_end")'), 'User 360 must summarize canonical subscriptions');
+expect(edge.includes('users: userOverview.users'), 'Bootstrap must expose the bounded User 360 summary list');
 expect(html.includes('id="business-overview"'), 'Traffic and revenue overview must be present');
 expect(html.includes('id="growth-chart"'), 'Growth trend chart must be present');
 expect(html.includes('id="momentum-rows"'), 'Product momentum table must be present');
