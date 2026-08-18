@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.111.0";
+import { productHealthOverview, type HealthProduct } from "./product-health.ts";
 
 const ALLOWED_ORIGINS = new Set([
   "https://liuh886.github.io",
@@ -37,14 +38,14 @@ const PUBLIC_GA4_PROPERTY_IDS: Record<string, string> = {
 };
 
 const RUM_PRODUCTS = [
-  { product_code: "alpha_engine", name: "AlphaEngine", host: "liuh886.github.io", path_prefix: "/alpha_engine/" },
-  { product_code: "flappyk", name: "FlappyK", host: "liuh886.github.io", path_prefix: "/FlappyK/" },
-  { product_code: "newsflow", name: "NewsFlow", host: "liuh886.github.io", path_prefix: "/NewsFlow/" },
-  { product_code: "ownly", name: "Ownly", host: "liuh886.github.io", path_prefix: "/ownly/" },
-  { product_code: "rhythmcoach", name: "RhythmCoach", host: "liuh886.github.io", path_prefix: "/RhythmCoach/" },
-  { product_code: "ccus_policy_hub", name: "CCUS Policy Hub", host: "liuh886.github.io", path_prefix: "/ccus-policy-hub/" },
-  { product_code: "notes", name: "Notes", host: "zhihaol.eu.org", path_prefix: "/" },
-] as const;
+  { product_code: "alpha_engine", name: "AlphaEngine", host: "liuh886.github.io", path_prefix: "/alpha_engine/", repo: "alpha_engine", branch: "main" },
+  { product_code: "flappyk", name: "FlappyK", host: "liuh886.github.io", path_prefix: "/FlappyK/", repo: "FlappyK", branch: "master" },
+  { product_code: "newsflow", name: "NewsFlow", host: "liuh886.github.io", path_prefix: "/NewsFlow/", repo: "NewsFlow", branch: "main" },
+  { product_code: "ownly", name: "Ownly", host: "liuh886.github.io", path_prefix: "/ownly/", repo: "ownly", branch: "main" },
+  { product_code: "rhythmcoach", name: "RhythmCoach", host: "liuh886.github.io", path_prefix: "/RhythmCoach/", repo: "RhythmCoach", branch: "main" },
+  { product_code: "ccus_policy_hub", name: "CCUS Policy Hub", host: "liuh886.github.io", path_prefix: "/ccus-policy-hub/", repo: "ccus-policy-hub", branch: "main" },
+  { product_code: "notes", name: "Notes", host: "zhihaol.eu.org", path_prefix: "/", repo: "notes", branch: "master" },
+] as const satisfies readonly HealthProduct[];
 
 interface CachedOverview {
   expiresAt: number;
@@ -330,7 +331,10 @@ function ratio(good: number, total: number): number | null {
 
 function emptyRumSummary(product: typeof RUM_PRODUCTS[number]): RumProductSummary {
   return {
-    ...product,
+    product_code: product.product_code,
+    name: product.name,
+    host: product.host,
+    path_prefix: product.path_prefix,
     status: "no_data",
     page_views: 0,
     visits: 0,
@@ -783,11 +787,12 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const [analytics, cloudflare, platform, stripe] = await Promise.all([
+    const [analytics, cloudflare, platform, stripe, productHealth] = await Promise.all([
       analyticsOverview(),
       cloudflareOverview(),
       supabaseUsage(admin),
       stripeOverview(admin),
+      productHealthOverview(RUM_PRODUCTS),
     ]);
     const payload = {
       generated_at: new Date().toISOString(),
@@ -797,6 +802,7 @@ Deno.serve(async (req: Request) => {
       analytics,
       platform,
       stripe,
+      product_health: productHealth,
     };
     cachedOverview = {
       expiresAt: Date.now() + cacheMinutes * 60_000,
