@@ -80,7 +80,7 @@ test('User 360 opens a recent user in the existing member workspace', async ({ p
   });
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '用户', exact: true })).toBeVisible();
+  await expect(page.locator('#user-360-title')).toBeVisible();
   const row = page.locator('#user-360-list button[data-user-id="user-1"]');
   await expect(row).toContainText('Example User');
   await expect(row).toContainText('ownly');
