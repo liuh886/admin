@@ -350,13 +350,23 @@
     return Boolean(state.subscription && MANAGEABLE_SUBSCRIPTION_STATUSES.has(state.subscription.status));
   }
 
+  function publicUser() {
+    if (!state.user) return null;
+    const alphaRole = state.user.app_metadata?.alpha_engine_role;
+    return Object.freeze({
+      id: state.user.id,
+      email: state.user.email || null,
+      app_metadata: alphaRole
+        ? Object.freeze({ alpha_engine_role: alphaRole })
+        : Object.freeze({}),
+    });
+  }
+
   function snapshot() {
     return Object.freeze({
       configured: true,
       loading: state.loading,
-      user: state.user,
-      profile: state.profile,
-      productAccount: state.productAccount,
+      user: publicUser(),
       entitlements: [...state.entitlements],
       isPro: state.entitlements.has(config.entitlementCode),
       subscription: state.subscription,

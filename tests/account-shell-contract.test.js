@@ -4,6 +4,7 @@ const script = fs.readFileSync('shared/account-shell.js', 'utf8');
 const css = fs.readFileSync('shared/account-shell.css', 'utf8');
 const portal = fs.readFileSync('supabase/functions/create-portal-session/index.ts', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/0006_shared_product_account_foundation.sql', 'utf8');
+const operationsOverview = fs.readFileSync('supabase/functions/operations-overview/index.ts', 'utf8');
 const browser = `${script}\n${css}`;
 
 function expect(condition, message) {
@@ -68,6 +69,15 @@ expect(script.includes('cancel_at_period_end'), 'Subscription cancellation sched
 expect(script.includes("accessUntil: '已安排取消 · Pro 有效至'"), 'Scheduled cancellation must be explicit in Chinese');
 expect(script.includes("accessUntil: 'Cancellation scheduled · Pro access through'"), 'Scheduled cancellation must be explicit in English');
 expect(script.includes('function subscriptionSummary(t)'), 'Account shell must render subscription lifecycle state');
+
+expect(script.includes('function publicUser()'), 'Public account state must be built explicitly');
+expect(script.includes('user: publicUser()'), 'Account events must expose the bounded public user view');
+expect(script.includes('alpha_engine_role: alphaRole'), 'The only app metadata exposed publicly is the current Alpha owner role needed by its consumer');
+expect(!script.includes('profile: state.profile'), 'Account events must not broadcast the full profile row');
+expect(!script.includes('productAccount: state.productAccount'), 'Account events must not broadcast the full product account row');
+expect(!script.includes('user: state.user'), 'Account events must not broadcast the full Supabase user object');
+expect(operationsOverview.includes('npm:@supabase/supabase-js@2.111.0'), 'Operations overview Edge Function must pin Supabase JS exactly');
+expect(!operationsOverview.includes('npm:@supabase/supabase-js@2\"'), 'Operations overview must not return to a floating Supabase JS major import');
 
 for (const required of [
   'function enhanceUpgrade(dialog, snapshotValue)',

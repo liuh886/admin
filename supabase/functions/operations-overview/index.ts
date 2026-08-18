@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.111.0";
 
 const ALLOWED_ORIGINS = new Set([
   "https://liuh886.github.io",
