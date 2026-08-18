@@ -322,3 +322,10 @@
   .payout-row { align-items: start; flex-direction: column; }
   .payout-row > div:last-child { justify-items: start; }
 }
+
+
+.health-table { min-width: 900px; }
+.health-table td { vertical-align: middle; }
+.health-table td:first-child span,
+.health-meta { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+.badge.pending { background: rgba(245, 195, 107, .1); color: var(--warning); }

@@ -1,4 +1,4 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/+esm';
 
 if (!document.querySelector('link[href="./operations.css"]')) {
   const stylesheet = document.createElement('link');
@@ -25,6 +25,8 @@ const els = {
   statViews: $('#overview-stat-views'),
   statProperties: $('#overview-stat-properties'),
   statPayments: $('#overview-stat-payments'),
+  productHealthRows: $('#product-health-rows'),
+  productHealthNote: $('#product-health-note'),
   growthChange: $('#growth-change'),
   growthCurrent: $('#growth-current'),
   growthPrevious: $('#growth-previous'),
@@ -358,6 +360,54 @@ function renderTraffic(analytics) {
   els.trafficNote.dataset.kind = failed.length ? 'error' : '';
 }
 
+function githubStatusLabel(status) {
+  const labels = {
+    success: '正常', failure: '失败', cancelled: '取消', timed_out: '超时',
+    action_required: '需处理', in_progress: '运行中', queued: '排队',
+    no_runs: '无记录', error: '不可用', unknown: '未知'
+  };
+  return labels[status] || String(status || '未知');
+}
+
+function githubStatusClass(status) {
+  if (status === 'success') return 'active';
+  if (['failure', 'timed_out', 'action_required', 'error'].includes(status)) return 'failed';
+  if (['in_progress', 'queued'].includes(status)) return 'pending';
+  return '';
+}
+
+function renderProductHealth(productHealth) {
+  const products = productHealth?.products || [];
+  if (!els.productHealthRows) return;
+  els.productHealthRows.innerHTML = products.length
+    ? products.map((product) => {
+      const service = product.service || {};
+      const github = product.github || {};
+      const freshness = product.freshness;
+      const serviceOk = service.status === 'up';
+      const serviceLabel = serviceOk ? `正常 · ${formatNumber(service.latency_ms)} ms` : service.status === 'down' ? `HTTP ${formatNumber(service.http_status)}` : '不可用';
+      const freshnessMain = freshness?.status === 'reported' ? `${formatNumber(freshness.age_hours, 1)} 小时前` : freshness ? '读取失败' : '未提供';
+      const freshnessMeta = freshness?.source || '该产品暂无 canonical marker';
+      const rowNeedsAttention = !serviceOk || ['failure', 'timed_out', 'action_required', 'error'].includes(github.status);
+      return `
+        <tr class="${rowNeedsAttention ? 'is-error' : ''}" data-product-code="${escapeHtml(product.product_code)}">
+          <td><strong>${escapeHtml(product.name)}</strong><span>${escapeHtml(product.repository)} · ${escapeHtml(product.branch)}</span></td>
+          <td><span class="badge ${serviceOk ? 'active' : 'failed'}">${escapeHtml(serviceLabel)}</span><span class="health-meta">${escapeHtml(String(service.http_status || '—'))}</span></td>
+          <td><span class="badge ${githubStatusClass(github.status)}">${escapeHtml(githubStatusLabel(github.status))}</span><span class="health-meta">${escapeHtml(github.workflow || '—')} · ${escapeHtml(formatDate(github.updated_at))}</span></td>
+          <td><strong>${escapeHtml(freshnessMain)}</strong><span class="health-meta">${escapeHtml(freshnessMeta)}</span></td>
+          <td>${escapeHtml(formatDate(service.checked_at))}</td>
+        </tr>`;
+    }).join('')
+    : '<tr><td colspan="5" class="empty-copy">暂无产品健康数据。</td></tr>';
+
+  const aggregate = productHealth?.aggregate || {};
+  const attention = products.filter((product) => product.service?.status !== 'up' || ['failure', 'timed_out', 'action_required', 'error'].includes(product.github?.status)).length;
+  els.productHealthNote.textContent = products.length
+    ? `${formatNumber(aggregate.services_up)}/${formatNumber(aggregate.products)} 个公开产品入口正常 · ${formatNumber(aggregate.actions_success)} 个产品最新 GitHub Actions 成功 · ${formatNumber(aggregate.freshness_reporting)} 个产品提供 canonical freshness marker${attention ? ` · ${attention} 个需关注` : ''}。`
+    : 'Product Health 暂无可用数据。';
+  els.productHealthNote.dataset.kind = attention ? 'error' : '';
+}
+
 function renderRevenue(stripe) {
   els.statPayments.textContent = formatNumber(stripe?.successful_payments);
 
@@ -406,6 +456,7 @@ function renderOverview(data) {
   renderPlatform(data.platform);
   renderRum(data.cloudflare);
   renderTraffic(data.analytics);
+  renderProductHealth(data.product_health);
   renderRevenue(data.stripe);
   const generated = formatDate(data.generated_at);
   const source = data.cached ? '缓存' : '实时刷新';
@@ -415,7 +466,7 @@ function renderOverview(data) {
 async function refreshOverview(forceRefresh = false) {
   if (loading) return;
   setLoading(true);
-  setStatus(forceRefresh ? '正在强制刷新增长、Cloudflare、GA4、Supabase 与 Stripe…' : '正在载入增长与经营数据…');
+  setStatus(forceRefresh ? '正在强制刷新 Product Health、增长、Cloudflare、GA4、Supabase 与 Stripe…' : '正在载入产品健康与经营数据…');
   try {
     renderOverview(await callOverview(forceRefresh));
   } catch (error) {
