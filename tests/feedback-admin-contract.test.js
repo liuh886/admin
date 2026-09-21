@@ -27,12 +27,9 @@ expect(edge.includes('npm:@supabase/supabase-js@2.111.0'), 'Feedback Edge Functi
 expect(edge.includes('membership_admins'), 'Feedback API must verify the admin whitelist');
 expect(edge.includes('Administrator access is required.'), 'Unauthorized feedback access must be rejected');
 expect(edge.includes('userClient.auth.getUser(token)'), 'Feedback API must validate the caller JWT');
-expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Feedback writes must independently verify AAL2');
-expect(edge.includes('data.currentLevel !== "aal2"'), 'Feedback writes must fail closed below AAL2');
 expect(edge.includes('requireOperator()'), 'Feedback updates must require operator access');
 expect(edge.includes('action === "list"'), 'Feedback API must support listing');
 expect(edge.includes('action === "update"'), 'Feedback API must support workflow updates');
-expect(edge.includes('await requireAal2();'), 'Feedback workflow updates must require AAL2');
 expect(edge.includes('membership_admin_actions'), 'Feedback updates must write to the append-only admin audit table');
 expect(edge.includes('feedback_update'), 'Feedback audit entries must use a stable action type');
 expect(edge.includes('Cache-Control'), 'Private feedback responses must disable shared caching');

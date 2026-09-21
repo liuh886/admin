@@ -199,13 +199,6 @@ Deno.serve(async (req: Request) => {
     return String(data.role);
   }
 
-  async function requireAal2(): Promise<void> {
-    const { data, error } = await userClient.auth.mfa.getAuthenticatorAssuranceLevel(token);
-    if (error || data.currentLevel !== "aal2") {
-      throw new Error("AAL2 multi-factor authentication is required to manage promotion codes.");
-    }
-  }
-
   async function productsCatalog(): Promise<Record<string, any>[]> {
     const { data, error } = await admin
       .from("billing_products")
@@ -257,7 +250,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "create") {
-      await requireAal2();
       if (!["owner", "operator"].includes(role)) return json(req, { error: "Operator access is required." }, 403);
 
       const code = promotionCode(body.code);
@@ -339,7 +331,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "deactivate") {
-      await requireAal2();
       if (!["owner", "operator"].includes(role)) return json(req, { error: "Operator access is required." }, 403);
       const promotionCodeId = String(body.promotion_code_id ?? "").trim();
       if (!/^promo_[A-Za-z0-9]+$/.test(promotionCodeId)) throw new Error("Invalid promotion code identifier.");

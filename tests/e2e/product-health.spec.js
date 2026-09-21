@@ -16,8 +16,7 @@ test('Product Health renders actionable service, Actions, and freshness facts', 
     body: `export function createClient() { return { auth: {
       getSession: async () => ({ data: { session: { access_token: 'token', user: { id: 'admin-1', email: 'owner@example.com' } } }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
-      signInWithOAuth: async () => ({ error: null }), signOut: async () => ({ error: null }),
-      mfa: { getAuthenticatorAssuranceLevel: async () => ({ data: { currentLevel: 'aal2', nextLevel: 'aal2' }, error: null }), listFactors: async () => ({ data: { all: [], totp: [] }, error: null }) }
+      signInWithOAuth: async () => ({ error: null }), signOut: async () => ({ error: null })
     } }; }`
   }));
 

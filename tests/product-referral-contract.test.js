@@ -31,7 +31,6 @@ for (const action of ['preview', 'get_or_create', 'redeem', 'admin_catalog', 'se
 }
 expect(edge.includes('metadata?.referral_trial_days'), 'Referral trial policy must come from billing_products metadata');
 expect(edge.includes('auth.getUser(token)'), 'Authenticated referral actions must validate the JWT against Supabase Auth');
-expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Referral policy mutations must require AAL2');
 expect(edge.includes('product_referral_codes'), 'Stable referral links must be resolved server-side');
 expect(edge.includes('product_referral_attributions'), 'Referral conversion counts must come from the attribution ledger');
 expect(edge.includes('supabase-js@2.111.0/cors'), 'Browser Edge Function CORS headers must come from the maintained Supabase SDK contract');

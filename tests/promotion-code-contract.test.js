@@ -24,7 +24,6 @@ expect(css.includes('.promotion-product-options') && css.includes('.promotion-re
 
 expect(edge.includes('npm:@supabase/supabase-js@2.111.0'), 'Promotion Edge Function must pin the tested Supabase client');
 expect(edge.includes('userClient.auth.getUser(token)'), 'Promotion administration must authenticate the admin JWT');
-expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Promotion mutations must require AAL2');
 expect(edge.includes('membership_admins'), 'Promotion mutations must require the admin whitelist');
 expect(edge.includes('billing_products'), 'Promotion product scope must resolve from the billing catalog');
 expect(edge.includes('stripe_product_id'), 'Promotion coupons must target canonical Stripe products');

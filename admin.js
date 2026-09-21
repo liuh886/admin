@@ -16,9 +16,7 @@ const state = {
   member: null,
   pendingPayment: null,
   pendingSubscription: null,
-  busy: false,
-  mfaMode: null,
-  mfaFactorId: null
+  busy: false
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -77,162 +75,6 @@ function setBusy(value, message = '') {
   if (message) setStatus(els.consoleStatus, message);
 }
 
-function ensureMfaPanel() {
-  let panel = document.getElementById('admin-mfa-panel');
-  if (panel) return panel;
-  panel = document.createElement('section');
-  panel.id = 'admin-mfa-panel';
-  panel.hidden = true;
-  panel.innerHTML = `
-    <div class="mfa-copy">
-      <p class="eyebrow">ADMIN · AAL2</p>
-      <h2 id="admin-mfa-title">管理员二次验证</h2>
-      <p id="admin-mfa-copy">管理操作需要验证器提供的一次性验证码。</p>
-    </div>
-    <div id="admin-mfa-enrollment" hidden>
-      <img id="admin-mfa-qr" alt="扫描二维码绑定验证器" style="width:min(196px,100%);height:auto;border-radius:12px;background:white;padding:8px">
-      <p class="status-line">使用 Google Authenticator、1Password、Microsoft Authenticator 等扫描二维码。</p>
-    </div>
-    <form id="admin-mfa-form">
-      <label>
-        <span>6 位验证码</span>
-        <input id="admin-mfa-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
-      </label>
-      <button id="admin-mfa-submit" class="button primary" type="submit">验证并进入</button>
-    </form>
-    <div class="dialog-actions">
-      <button id="admin-mfa-setup" class="button ghost" type="button">设置验证器</button>
-      <button id="admin-mfa-signout" class="button ghost" type="button">退出此账户</button>
-    </div>
-  `;
-  els.authGate.appendChild(panel);
-
-  $('#admin-mfa-setup').addEventListener('click', () => void startMfaEnrollment());
-  $('#admin-mfa-signout').addEventListener('click', async () => {
-    await client.auth.signOut();
-    resetMfaGate();
-    showGate('已退出管理员账户。', 'success');
-  });
-  $('#admin-mfa-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    void verifyMfa($('#admin-mfa-code').value.trim());
-  });
-  return panel;
-}
-
-function resetMfaGate() {
-  state.mfaMode = null;
-  state.mfaFactorId = null;
-  const panel = ensureMfaPanel();
-  panel.hidden = true;
-  els.googleLogin.hidden = false;
-  const qr = $('#admin-mfa-qr');
-  if (qr) qr.removeAttribute('src');
-  const enrollment = $('#admin-mfa-enrollment');
-  if (enrollment) enrollment.hidden = true;
-  const form = $('#admin-mfa-form');
-  if (form) form.hidden = false;
-  const setup = $('#admin-mfa-setup');
-  if (setup) setup.hidden = false;
-  const code = $('#admin-mfa-code');
-  if (code) code.value = '';
-}
-
-async function startMfaEnrollment() {
-  setStatus(els.authStatus, '正在创建验证器绑定…');
-  const { data: factors, error: listError } = await client.auth.mfa.listFactors();
-  if (listError) {
-    setStatus(els.authStatus, listError.message, 'error');
-    return;
-  }
-  for (const factor of factors.all || []) {
-    if (factor.factor_type === 'totp' && factor.status === 'unverified') {
-      try { await client.auth.mfa.unenroll({ factorId: factor.id }); } catch { /* stale enrollment */ }
-    }
-  }
-  const { data, error } = await client.auth.mfa.enroll({
-    factorType: 'totp',
-    friendlyName: 'Hao Apps Admin'
-  });
-  if (error) {
-    setStatus(els.authStatus, error.message, 'error');
-    return;
-  }
-  state.mfaMode = 'enroll';
-  state.mfaFactorId = data.id;
-  ensureMfaPanel().hidden = false;
-  $('#admin-mfa-title').textContent = '绑定管理员验证器';
-  $('#admin-mfa-copy').textContent = '扫描二维码后输入验证器生成的 6 位验证码。绑定成功后本次会话升级为 AAL2。';
-  $('#admin-mfa-enrollment').hidden = false;
-  $('#admin-mfa-qr').src = data.totp.qr_code;
-  $('#admin-mfa-form').hidden = false;
-  $('#admin-mfa-setup').hidden = true;
-  $('#admin-mfa-code').focus();
-  setStatus(els.authStatus, '二维码已生成。完成绑定后才能进入运营控制台。');
-}
-
-async function verifyMfa(code) {
-  if (!state.mfaFactorId || !/^\d{6}$/.test(code)) {
-    setStatus(els.authStatus, '请输入验证器中的 6 位验证码。', 'error');
-    return;
-  }
-  setStatus(els.authStatus, '正在验证 AAL2…');
-  const { data: challenge, error: challengeError } = await client.auth.mfa.challenge({
-    factorId: state.mfaFactorId
-  });
-  if (challengeError) {
-    setStatus(els.authStatus, challengeError.message, 'error');
-    return;
-  }
-  const { error } = await client.auth.mfa.verify({
-    factorId: state.mfaFactorId,
-    challengeId: challenge.id,
-    code
-  });
-  if (error) {
-    setStatus(els.authStatus, error.message, 'error');
-    return;
-  }
-  await secureBootstrap();
-}
-
-async function requireAal2Gate() {
-  const { data, error } = await client.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (error) throw error;
-  if (data.currentLevel === 'aal2') {
-    resetMfaGate();
-    return true;
-  }
-
-  const panel = ensureMfaPanel();
-  panel.hidden = false;
-  els.googleLogin.hidden = true;
-  const { data: factors, error: factorsError } = await client.auth.mfa.listFactors();
-  if (factorsError) throw factorsError;
-  const verifiedTotp = (factors.totp || []).find((factor) => factor.status === 'verified') || factors.totp?.[0];
-  if (verifiedTotp) {
-    state.mfaMode = 'challenge';
-    state.mfaFactorId = verifiedTotp.id;
-    $('#admin-mfa-title').textContent = '管理员二次验证';
-    $('#admin-mfa-copy').textContent = '输入验证器生成的 6 位验证码后进入运营控制台。';
-    $('#admin-mfa-enrollment').hidden = true;
-    $('#admin-mfa-form').hidden = false;
-    $('#admin-mfa-setup').hidden = true;
-    $('#admin-mfa-code').focus();
-    setStatus(els.authStatus, '此管理员账户已启用 MFA，需要完成二次验证。');
-  } else {
-    state.mfaMode = 'setup';
-    state.mfaFactorId = null;
-    $('#admin-mfa-title').textContent = '先启用管理员二次验证';
-    $('#admin-mfa-copy').textContent = '此控制台可以赠送会员、取消订阅和退款。首次进入需要绑定一个 TOTP 验证器。';
-    $('#admin-mfa-enrollment').hidden = true;
-    $('#admin-mfa-form').hidden = true;
-    $('#admin-mfa-setup').hidden = false;
-    setStatus(els.authStatus, '管理员控制台要求 AAL2。请先绑定验证器。');
-  }
-  return false;
-}
-
 async function callAdmin(action, payload = {}) {
   const { data, error } = await client.auth.getSession();
   if (error || !data.session?.access_token) throw new Error('登录会话不可用，请重新登录。');
@@ -254,14 +96,11 @@ async function secureBootstrap() {
   try {
     showGate('正在验证管理员权限…');
     const bootstrapData = await callAdmin('bootstrap');
-    const ready = await requireAal2Gate();
-    if (!ready) return;
     state.bootstrap = bootstrapData;
     renderBootstrap();
     showConsole();
-    setStatus(els.consoleStatus, '运营台已连接 Live Mode · AAL2。', 'success');
+    setStatus(els.consoleStatus, '运营台已连接 Live Mode。', 'success');
   } catch (error) {
-    resetMfaGate();
     showGate(error.message || '管理员身份验证失败。', 'error');
   }
 }
@@ -298,7 +137,7 @@ function renderBootstrap() {
   const data = state.bootstrap;
   if (!data) return;
   els.operatorEmail.textContent = data.actor.email || data.actor.id;
-  els.operatorRole.textContent = `${data.actor.role} · AAL2`;
+  els.operatorRole.textContent = data.actor.role;
   els.statUsers.textContent = data.counts.users;
   els.statSubscriptions.textContent = data.counts.active_subscriptions;
   els.statGrants.textContent = data.counts.active_grants;
@@ -469,7 +308,6 @@ els.signOut.addEventListener('click', async () => {
   await client.auth.signOut();
   state.member = null;
   state.bootstrap = null;
-  resetMfaGate();
   showGate('已退出管理员账户。', 'success');
 });
 
@@ -664,12 +502,9 @@ for (const dialog of [els.refundDialog, els.cancelDialog]) {
   });
 }
 
-ensureMfaPanel();
-
 client.auth.onAuthStateChange((_event, session) => {
   if (session) window.setTimeout(() => void secureBootstrap(), 0);
   else {
-    resetMfaGate();
     showGate();
   }
 });

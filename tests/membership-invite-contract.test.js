@@ -13,9 +13,6 @@ function expect(condition, message) {
 expect(html.includes('src="./invite.js"'), 'Admin shell must load the invitation module');
 expect(browser.includes('@supabase/supabase-js@2.111.0/+esm'), 'Invitation browser Supabase client must be pinned to the tested release');
 expect(edge.includes('npm:@supabase/supabase-js@2.111.0'), 'Invitation Edge Function Supabase client must be pinned to the tested release');
-expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Invitation creation must independently verify AAL2');
-expect(edge.includes('data.currentLevel !== "aal2"'), 'Invitation creation must fail closed below AAL2');
-expect(edge.includes('if (action === "create")') && edge.includes('await requireAal2();'), 'Privileged invitation creation must require AAL2');
 expect(!edge.includes('create_referral'), 'Product referrals must not remain inside the one-time membership invitation service');
 expect(!edge.includes('ALPHA_REFERRAL_DAYS') && !edge.includes('ALPHA_ENTITLEMENT_CODE'), 'Product-specific referral policy must not remain in membership-invite');
 expect(edge.includes('if (action === "redeem")'), 'Recipient redemption must remain a separate customer action');

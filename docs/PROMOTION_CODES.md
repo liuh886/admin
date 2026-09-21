@@ -51,6 +51,6 @@ Admin can deactivate a Promotion Code. Deactivation stops future redemptions but
 ## Security
 
 - Stripe secret keys remain server-side in Supabase Edge Functions.
-- Promotion mutations require a valid Supabase user JWT, owner/operator membership, and AAL2 MFA.
+- Promotion mutations require a valid Supabase user JWT, active owner/operator membership.
 - Browser assets contain only the publishable Supabase key.
 - Stripe remains the promotion source of truth; Supabase stores only the existing admin audit log.
