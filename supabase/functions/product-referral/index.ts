@@ -165,7 +165,7 @@ Deno.serve(async (req: Request) => {
     });
     const { data, error } = await userClient.auth.getUser(token);
     if (error || !data.user) throw new Error("Authentication failed.");
-    return { user: data.user, userClient, token };
+    return { user: data.user };
   };
 
   const adminRole = async (userId: string): Promise<string | null> => {
@@ -176,13 +176,6 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (error || !data?.active) return null;
     return String(data.role);
-  };
-
-  const requireAal2 = async (userClient: ReturnType<typeof createClient>, token: string) => {
-    const { data, error } = await userClient.auth.mfa.getAuthenticatorAssuranceLevel(token);
-    if (error || data.currentLevel !== "aal2") {
-      throw new Error("AAL2 multi-factor authentication is required.");
-    }
   };
 
   const previewByCode = async (code: string) => {
@@ -352,12 +345,11 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "set_policy") {
-      const { user, userClient, token } = await authenticate();
+      const { user } = await authenticate();
       const role = await adminRole(user.id);
       if (!role || !["owner", "operator"].includes(role)) {
         return json(req, { error: "Operator access is required." }, 403);
       }
-      await requireAal2(userClient, token);
 
       const requestedProduct = productCode(body.product_code);
       const days = trialDays(body.referral_trial_days);

@@ -23,12 +23,6 @@ expect(operationsScript.includes('/functions/v1/operations-overview'), 'Frontend
 expect(operationsScript.includes('@supabase/supabase-js@2.111.0/+esm'), 'Operations browser Supabase client must be pinned to the tested release');
 expect(script.includes('@supabase/supabase-js@2.111.0/+esm'), 'Admin browser Supabase client must be pinned to the tested release');
 expect(edge.includes('npm:@supabase/supabase-js@2.111.0'), 'Membership Edge Function Supabase client must be pinned to the tested release');
-expect(script.includes('getAuthenticatorAssuranceLevel()'), 'Admin browser must check authenticator assurance level');
-expect(script.includes("factorType: 'totp'"), 'Admin browser must support TOTP enrollment');
-expect(script.includes("data.currentLevel === 'aal2'"), 'Admin console must require an AAL2 session before opening');
-expect(edge.includes('MUTATING_ACTIONS'), 'Membership Edge Function must classify privileged mutations');
-expect(edge.includes('getAuthenticatorAssuranceLevel(token)'), 'Membership Edge Function must independently verify AAL2');
-expect(edge.includes('data.currentLevel !== "aal2"'), 'Membership mutations must fail closed below AAL2');
 expect(html.includes('id="user-360-list"'), 'User 360 recent-user list must be present');
 expect(html.includes('id="member-search"'), 'User 360 must retain exact email search');
 expect(script.includes('function renderUserSummaries(users)'), 'User 360 summaries must have one renderer');

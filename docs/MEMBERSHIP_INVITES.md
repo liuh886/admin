@@ -78,6 +78,6 @@ The first authenticated account atomically claims the invitation. The same accou
 - Raw invitation tokens are never stored in PostgreSQL or audit logs.
 - Browser roles cannot read or mutate `membership_invites` directly.
 - The offer preview in the fragment is display-only and cannot change the server-side invitation contents.
-- Invitation creation requires an active `owner` or `operator` row in `membership_admins` and AAL2.
+- Invitation creation requires an active `owner` or `operator` row in `membership_admins` and a valid Supabase user session.
 - Redemption requires a valid Supabase user JWT but no admin role.
 - Stripe and service-role secrets stay inside the `membership-invite` Edge Function.

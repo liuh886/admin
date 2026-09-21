@@ -19,9 +19,9 @@ Private operations console and canonical identity / membership control plane for
 
 ## Security boundary
 
-The browser contains only the Supabase publishable key. A user must first be present and active in `membership_admins`; the private console then requires TOTP multi-factor authentication and an `aal2` session before it opens.
+The browser contains only the Supabase publishable key. A user must first be present and active in `membership_admins`; the private console opens after the server verifies that administrator membership. Existing Supabase sessions are restored automatically; otherwise Google OAuth handles sign-in without an additional application verification step.
 
-Privileged mutations are enforced again inside the Supabase Edge Functions. `membership-admin` requires `aal2` for complimentary grants, grant changes, subscription cancellation, and refunds. `membership-invite` requires `aal2` for invitation creation; recipient redemption remains a normal authenticated customer action and does not require administrator MFA.
+Privileged mutations are enforced again inside the Supabase Edge Functions. Every administrative request validates the Supabase user and active administrator membership. Owner/operator roles govern grants, invitations, promotions, referral settings, and feedback updates; subscription cancellations and refunds require the owner role. Recipient redemption remains a normal authenticated customer action.
 
 Stripe secrets, the Google Analytics service-account credential, and the Supabase service role remain inside server-side Edge Functions. Browser and membership/billing Edge Functions pin the Supabase JavaScript client to a tested exact release rather than a floating major version.
 
@@ -34,9 +34,9 @@ The console is intentionally excluded from search indexing and is not linked fro
 - `create-checkout-session`: authenticated shared Pro checkout; resolves the product and active default Stripe price server-side.
 - `create-portal-session`: authenticated Stripe Customer Portal entry for subscription management.
 - `stripe-webhook`: signature-verified Stripe event receiver; synchronizes subscription state and effective entitlements. This is intentionally the only public Edge Function in this group and does not use JWT verification because Stripe authenticates with the webhook signature.
-- `membership-admin`: member lookup plus AAL2-protected complimentary grants, cancellations, and refunds.
-- `membership-invite`: administrator invitation catalog/create and recipient trial redemption; creation is AAL2-protected.
-- `feedback-admin`: read-only administrator feedback access plus AAL2-protected workflow mutations.
+- `membership-admin`: member lookup plus role-protected complimentary grants, cancellations, and refunds.
+- `membership-invite`: administrator invitation catalog/create and recipient trial redemption; creation is role-protected.
+- `feedback-admin`: read-only administrator feedback access plus role-protected workflow mutations.
 - `operations-overview`: read-only GA4, Cloudflare, Supabase, and Stripe operating summary with a short server-side cache.
 
 ## Repository ownership

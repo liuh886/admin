@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
 
-test('User 360 opens a recent user in the existing member workspace', async ({ page }) => {
+test('restored session opens User 360 without MFA and signs out', async ({ page }) => {
   await page.route('https://cdn.jsdelivr.net/**', (route) => route.fulfill({
     contentType: 'application/javascript',
     body: `
@@ -16,11 +16,7 @@ test('User 360 opens a recent user in the existing member workspace', async ({ p
             getSession: async () => ({ data: { session: { access_token: 'token', user: { id: 'admin-1', email: 'owner@example.com' } } }, error: null }),
             onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
             signInWithOAuth: async () => ({ error: null }),
-            signOut: async () => ({ error: null }),
-            mfa: {
-              getAuthenticatorAssuranceLevel: async () => ({ data: { currentLevel: 'aal2', nextLevel: 'aal2' }, error: null }),
-              listFactors: async () => ({ data: { all: [], totp: [] }, error: null })
-            }
+            signOut: async () => ({ error: null })
           }
         };
       }
@@ -94,6 +90,10 @@ test('User 360 opens a recent user in the existing member workspace', async ({ p
 
   await page.goto('/');
   await expect(page.locator('#console')).toBeVisible();
+  await expect(page.locator('#auth-gate')).toBeHidden();
+  await expect(page.locator('#admin-mfa-panel')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('#console')).toBeVisible();
   const row = page.locator('#user-360-list button[data-user-id="user-1"]');
   await expect(row).toContainText('Example User');
   await expect(row).toContainText('ownly');
@@ -101,4 +101,7 @@ test('User 360 opens a recent user in the existing member workspace', async ({ p
   await expect(page.locator('#member-workspace')).toBeVisible();
   await expect(page.locator('#member-email')).toHaveText('user@example.com');
   await expect(page.locator('#entitlement-list')).toContainText('ownly.pro');
+  await page.locator('#sign-out').click();
+  await expect(page.locator('#console')).toBeHidden();
+  await expect(page.locator('#google-login')).toBeVisible();
 });
